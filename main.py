@@ -145,11 +145,12 @@ def handle_telegram_menu():
         print("─"*50)
         print("  [1] 🔑 Masukkan / Ubah Bot Token & Chat ID")
         print("  [2] 🧪 Kirim Pesan Tes ke Telegram")
-        print("  [3] 📖 Panduan Lengkap Cara Buat Bot Telegram")
+        print("  [3] 🤖 Jalankan Bot Interaktif (Balas Chat /start, /scan, /portfolio, /buy)")
+        print("  [4] 📖 Panduan Lengkap Cara Buat Bot Telegram")
         print("  [0] ⬅️  Kembali ke Menu Utama")
         print("─"*50)
         
-        sub = input("Pilih menu Telegram [0-3]: ").strip()
+        sub = input("Pilih menu Telegram [0-4]: ").strip()
         
         if sub == "1":
             print("\n🔑 PENGATURAN KREDENSIAL TELEGRAM:")
@@ -194,6 +195,13 @@ def handle_telegram_menu():
                     print(f"❌ PERINGATAN: {res['message']}")
                     
         elif sub == "3":
+            if not is_active:
+                print("⚠️ Bot belum dikonfigurasi. Silakan masukkan token di menu [1] terlebih dahulu.")
+            else:
+                from bot_telegram import start_interactive_listener
+                start_interactive_listener()
+                
+        elif sub == "4":
             print("\n📖 PANDUAN CARA MENGHUBUNGKAN BOT TELEGRAM:")
             print("1. Buka aplikasi Telegram dan cari bot: @BotFather (yang memiliki centang biru resmi).")
             print("2. Kirim pesan: /newbot")
@@ -212,6 +220,7 @@ def handle_telegram_menu():
             print("⚠️ Pilihan tidak valid.")
         
         input("\n[Tekan Enter untuk melanjutkan]")
+
 
 
 def interactive_loop():
