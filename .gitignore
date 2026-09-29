@@ -1,0 +1,23 @@
+# Environment variables & secrets (PENTING: Jangan di-upload ke GitHub)
+.env
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# Log files & scratch data
+*.log
+scratch/
+
+# OS specific files
+.DS_Store
+Thumbs.db
