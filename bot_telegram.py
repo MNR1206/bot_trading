@@ -1,14 +1,22 @@
 """
-Bot Telegram Interaktif Saham Indonesia (IDX / BEI)
-Menerima dan merespons perintah langsung dari chat Telegram (Two-Way Interactive Bot):
-- /start & /help: Menampilkan menu & tombol interaktif
-- /scan: Memindai saham IDX dengan lonjakan volume & momentum (lengkap dengan Area Beli & Stop Loss)
-- /plan <KODE>: Menampilkan Trading Plan lengkap (Area Beli, Stop Loss, Target TP1/TP2, Risk:Reward)
-- /price <KODE>: Info harga saham terkini + Trading Plan + Tombol Beli Cepat
-- /buy <KODE> <LOT> [TP%] [SL%]: Membeli saham simulasi dengan SL & TP kustom
+Bot Telegram Interaktif Super Lengkap Saham Indonesia (IDX / BEI)
+Fitur-Fitur Lengkap:
+- /start & /help: Menampilkan menu & tombol navigasi interaktif
+- /scan: Memindai saham IDX dengan lonjakan volume & momentum
+- /plan <KODE>: Trading Plan lengkap (Area Beli, Stop Loss, Target TP1/TP2, Risk:Reward)
+- /chart <KODE>: 📊 Mengirim gambar grafik candlestick dengan MA, TP, SL langsung ke chat Telegram!
+- /alert <KODE> <HARGA>: 🚨 Memasang alarm pengingat harga otomatis
+- /alerts & /delalert <ID>: Melihat dan menghapus alarm harga aktif
+- /flow <KODE> atau /bandar <KODE>: 🌐 Analisis arus dana asing / Bandarmology & Money Flow (CMF & OBV)
+- /watch <KODE> & /unwatch <KODE>: ⭐ Mengelola daftar saham pantauan favorit pribadi
+- /watchlist atau /mywatch: Memindai khusus saham-saham pilihan pribadi Anda
+- /calc <KODE> <RISIKO_RP>: 🧮 Kalkulator Money Management & ukuran lot ideal sesuai toleransi risiko
+- /buy <KODE> <LOT> [TP%] [SL%]: Membeli saham simulasi (Paper Trading)
 - /sell <KODE> [LOT]: Menjual saham simulasi
-- /portfolio: Menampilkan ringkasan saldo & saham paper trading
-- Background Scheduler: Otomatis kirim update ke Telegram setiap jam bursa dibuka (09:05 WIB & 13:35/14:05 WIB)!
+- /portfolio: Menampilkan ringkasan saldo & posisi saham virtual
+- Background Scheduler:
+  1. Memantau alarm harga setiap 30 detik (notifikasi instan saat harga menyentuh target)
+  2. Otomatis kirim update ke Telegram setiap jam bursa dibuka (09:05 WIB & 13:35/14:05 WIB) & tutup (16:05 WIB)!
 """
 import os
 import sys
@@ -33,7 +41,11 @@ from paper_trader import (
     load_portfolio, buy_stock, sell_stock, update_and_check_portfolio,
     display_portfolio_summary
 )
-from telegram_notifier import get_credentials, send_telegram_message
+from telegram_notifier import get_credentials, send_telegram_message, send_telegram_photo
+from chart_generator import generate_candlestick_chart
+from alert_manager import add_price_alert, get_user_alerts, delete_price_alert, check_all_alerts
+from bandarmology import analyze_bandarmology
+from watchlist_manager import add_to_watchlist, remove_from_watchlist, get_user_watchlist
 
 # Timezone WIB (UTC + 7)
 WIB = timezone(timedelta(hours=7))
@@ -60,26 +72,29 @@ def send_reply(chat_id: str, text: str, reply_markup: Optional[Dict[str, Any]] =
 def handle_start(chat_id: str, first_name: str):
     welcome_msg = f"""
 👋 *Halo {first_name}!* 
-Selamat datang di *Bot Trading Saham Indonesia (IDX / BEI)* 🤖📈
+Selamat datang di *Bot Trading Saham Indonesia (IDX / BEI) Super Lengkap* 🤖📈
 
-Bot ini otomatis memantau pasar saham, memberikan rekomendasi **Area Beli (Entry)**, **Stop Loss (SL)**, dan **Target Profit (TP)**, serta mengirimkan **update otomatis setiap jam bursa dibuka**.
+Bot ini dilengkapi kecerdasan analisis kuantitatif, grafis visual, alarm harga, dan deteksi arus dana besar (Bandarmology).
 
-📋 *Daftar Perintah:*
-  • `/scan` - 🔍 Pindai saham IDX (lengkap dengan Area Beli & SL)
-  • `/plan <KODE>` - 🎯 Buat Trading Plan saham (contoh: `/plan BBCA`)
-  • `/price <KODE>` - 📈 Cek harga saham + rekomendasi Buy & SL
-  • `/buy <KODE> <LOT> [TP%] [SL%]` - 🛒 Beli saham (contoh: `/buy BBCA 5` atau `/buy BBCA 5 5 3`)
-  • `/sell <KODE> [LOT]` - 💰 Jual saham (contoh: `/sell BBCA 5`)
-  • `/portfolio` - 💼 Cek saldo & posisi saham virtual Anda
-  • `/update` - 🔔 Paksa kirim update pasar bursa sekarang
+📋 *Menu Perintah Lengkap:*
+  • `/scan` - 🔍 Pindai saham IDX dengan lonjakan volume & momentum
+  • `/plan <KODE>` - 🎯 Trading Plan lengkap (Area Beli, Stop Loss & TP)
+  • `/chart <KODE>` - 📊 Kirim gambar grafik Candlestick + MA + TP/SL
+  • `/alert <KODE> <HARGA>` - 🚨 Pasang alarm pengingat harga (contoh: `/alert BBCA 6000`)
+  • `/alerts` - 📋 Lihat daftar alarm harga aktif
+  • `/flow <KODE>` - 🌐 Cek arus dana asing & Bandarmology (contoh: `/flow BBRI`)
+  • `/calc <KODE> <RISIKO>` - 🧮 Kalkulator Lot Ideal (contoh: `/calc BBCA 500000`)
+  • `/watch <KODE>` - ⭐ Tambah saham ke pantauan favorit Anda
+  • `/watchlist` - 🌟 Pantau khusus saham-saham favorit Anda
+  • `/buy <KODE> <LOT> [TP%] [SL%]` - 🛒 Beli saham di akun simulasi
+  • `/sell <KODE> [LOT]` - 💰 Jual saham di akun simulasi
+  • `/portfolio` - 💼 Cek saldo & posisi saham virtual
+  • `/update` - 🔔 Paksa kirim update pasar bursa saat ini
   • `/help` - ℹ️ Tampilkan panduan ini kembali
 
-⏰ *Jadwal Update Otomatis:*
-  • *Sesi 1 Buka:* 09:05 WIB
-  • *Sesi 2 Buka:* 13:35 WIB (Jumat: 14:05 WIB)
-  • *Pasar Tutup:* 16:05 WIB
+⏰ *Update Otomatis Jam Bursa:* 09:05 WIB | 13:35 WIB | 16:05 WIB
 
-_Gunakan tombol di bawah untuk akses cepat:_
+_Klik tombol cepat di bawah untuk mencoba fitur favorit:_
 """
     keyboard = {
         "inline_keyboard": [
@@ -88,16 +103,59 @@ _Gunakan tombol di bawah untuk akses cepat:_
                 {"text": "💼 Cek Portofolio", "callback_data": "btn_portfolio"}
             ],
             [
-                {"text": "🎯 Plan BBCA", "callback_data": "btn_plan_BBCA"},
-                {"text": "🎯 Plan BBRI", "callback_data": "btn_plan_BBRI"},
-                {"text": "🎯 Plan BMRI", "callback_data": "btn_plan_BMRI"}
+                {"text": "📊 Chart BBCA", "callback_data": "btn_chart_BBCA"},
+                {"text": "📊 Chart BBRI", "callback_data": "btn_chart_BBRI"},
+                {"text": "🌐 Flow BMRI", "callback_data": "btn_flow_BMRI"}
             ],
             [
-                {"text": "🔔 Update Pasar Sekarang", "callback_data": "btn_update_now"}
+                {"text": "🎯 Plan BBCA", "callback_data": "btn_plan_BBCA"},
+                {"text": "⭐ Watchlist Saya", "callback_data": "btn_watchlist"},
+                {"text": "🔔 Update Pasar", "callback_data": "btn_update_now"}
             ]
         ]
     }
     send_reply(chat_id, welcome_msg.strip(), reply_markup=keyboard)
+
+def handle_chart_cmd(chat_id: str, symbol: str):
+    """
+    Menghasilkan dan mengirimkan gambar grafik candlestick langsung ke chat Telegram
+    """
+    sym = get_clean_symbol(symbol)
+    send_reply(chat_id, f"⏳ *Sedang merender chart candlestick untuk {sym}...*")
+    
+    chart_file = generate_candlestick_chart(sym)
+    if not chart_file or not os.path.exists(chart_file):
+        send_reply(chat_id, f"❌ Gagal membuat chart untuk `{sym}`. Pastikan simbol saham benar.")
+        return
+        
+    plan = get_trading_plan(sym)
+    caption = f"""
+📊 *GRAFIK CANDLESTICK: {sym} (IDX)*
+━━━━━━━━━━━━━━━━━━━━
+💵 *Harga Now:* `{format_idr(plan['close'])}` ({plan['change_pct']:+.2f}%)
+🛒 *Area Beli (Entry):* `{format_idr(plan['buy_min'])} - {format_idr(plan['buy_max'])}`
+🛑 *Stop Loss (SL):* `{format_idr(plan['sl_price'])}` (-{plan['sl_pct']:.1f}%)
+🎯 *Target TP 2:* `{format_idr(plan['tp2'])}` (+5.0%)
+⚖️ *Risk/Reward:* `1 : {plan['rrr']}`
+━━━━━━━━━━━━━━━━━━━━
+"""
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": f"🛒 Beli 1 Lot {sym}", "callback_data": f"btn_buy_{sym}_1"},
+                {"text": f"🛒 Beli 5 Lot {sym}", "callback_data": f"btn_buy_{sym}_5"},
+                {"text": f"🛒 Beli 10 Lot {sym}", "callback_data": f"btn_buy_{sym}_10"}
+            ],
+            [
+                {"text": f"🌐 Bandarmology {sym}", "callback_data": f"btn_flow_{sym}"},
+                {"text": f"🎯 Plan Detail", "callback_data": f"btn_plan_{sym}"}
+            ]
+        ]
+    }
+    
+    success = send_telegram_photo(chart_file, caption=caption.strip(), reply_markup=keyboard)
+    if not success:
+        send_reply(chat_id, "⚠️ Gagal mengirim file gambar ke Telegram. Coba ulangi beberapa saat lagi.")
 
 def handle_plan_cmd(chat_id: str, symbol: str):
     """
@@ -131,24 +189,220 @@ def handle_plan_cmd(chat_id: str, symbol: str):
 
 🎯 *TARGET TAKE PROFIT (TP):*
   • *Target TP 1* : `{format_idr(plan['tp1'])}` (+3.0%)
-  • *Target TP 2* : `{format_idr(plan['tp2'])}` (+{plan['sl_pct'] + 2.0:.1f}%)
+  • *Target TP 2* : `{format_idr(plan['tp2'])}` (+5.0%)
   • *Target TP 3* : `{format_idr(plan['tp3'])}` (+8.0%)
 
 ⚖️ *Risk to Reward Ratio:* `1 : {plan['rrr']}`
 🧱 *Support Terdekat:* `{format_idr(plan['support'])}`
 🏢 *Resistance:* `{format_idr(plan['resistance'])}`
 ━━━━━━━━━━━━━━━━━━━━
-_Klik tombol di bawah untuk langsung mengeksekusi pembelian di akun simulasi:_
 """
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": f"🛒 Beli 1 Lot {plan['symbol']}", "callback_data": f"btn_buy_{plan['symbol']}_1"},
-                {"text": f"🛒 Beli 5 Lot {plan['symbol']}", "callback_data": f"btn_buy_{plan['symbol']}_5"}
+                {"text": f"📊 Lihat Chart {plan['symbol']}", "callback_data": f"btn_chart_{plan['symbol']}"},
+                {"text": f"🌐 Cek Bandar {plan['symbol']}", "callback_data": f"btn_flow_{plan['symbol']}"}
             ],
             [
-                {"text": f"🛒 Beli 10 Lot {plan['symbol']}", "callback_data": f"btn_buy_{plan['symbol']}_10"},
-                {"text": "🔍 Scan Saham Lain", "callback_data": "btn_scan"}
+                {"text": f"🛒 Beli 1 Lot {plan['symbol']}", "callback_data": f"btn_buy_{plan['symbol']}_1"},
+                {"text": f"🛒 Beli 5 Lot {plan['symbol']}", "callback_data": f"btn_buy_{plan['symbol']}_5"},
+                {"text": f"🛒 Beli 10 Lot {plan['symbol']}", "callback_data": f"btn_buy_{plan['symbol']}_10"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg.strip(), reply_markup=keyboard)
+
+def handle_bandarmology_cmd(chat_id: str, symbol: str):
+    """
+    Menampilkan analisis arus dana besar / Bandarmology & Money Flow
+    """
+    sym = get_clean_symbol(symbol)
+    send_reply(chat_id, f"⏳ *Menganalisis arus dana & akumulasi bandar {sym}...*")
+    
+    flow = analyze_bandarmology(sym)
+    if not flow.get("valid"):
+        send_reply(chat_id, f"❌ Gagal memuat data bandarmology untuk `{sym}`.")
+        return
+        
+    obv_str = "🟢 Uptrend (Akumulasi Berjalan)" if flow['is_obv_uptrend'] else "🔴 Downtrend (Tekanan Jual)"
+    cmf_str = f"+{flow['cmf']:.3f}" if flow['cmf'] >= 0 else f"{flow['cmf']:.3f}"
+    
+    msg = f"""
+🌐 *ANALISIS ARUS DANA & BANDARMOLOGY: {flow['symbol']}*
+━━━━━━━━━━━━━━━━━━━━
+🏆 *Skor Akumulasi:* `{flow['score']}/100`
+📊 *Status:* {flow['status']}
+💡 *Sentimen:* _{flow['sentiment']}_
+
+📈 *Indikator Aliran Dana:*
+  • *Chaikin Money Flow (CMF):* `{cmf_str}`
+    _(> +0.05 = Inflow Uang Besar | < -0.05 = Outflow)_
+  • *Tren OBV (Volume Akumulasi):* {obv_str}
+  • *Relative Volume (RVol):* `{flow['rvol']}x`
+  • *Turnover Hari Ini:* `{format_idr(flow['turnover'])}`
+  • *Performa 5 Hari:* `{flow['change_5d']:+.2f}%`
+━━━━━━━━━━━━━━━━━━━━
+"""
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": f"📊 Chart {sym}", "callback_data": f"btn_chart_{sym}"},
+                {"text": f"🎯 Trading Plan {sym}", "callback_data": f"btn_plan_{sym}"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg.strip(), reply_markup=keyboard)
+
+def handle_alert_cmd(chat_id: str, args: list):
+    """
+    Format: /alert <KODE> <HARGA>
+    Contoh: /alert BBCA 6000
+    """
+    if len(args) < 2:
+        send_reply(chat_id, "⚠️ *Format salah!*\nGunakan: `/alert <KODE> <HARGA_TARGET>`\nContoh: `/alert BBCA 6000` atau `/alert BBRI 3200`")
+        return
+        
+    sym = args[0].upper()
+    try:
+        price = float(args[1].replace(".", "").replace(",", ""))
+    except ValueError:
+        send_reply(chat_id, "⚠️ Target harga harus berupa angka. Contoh: `/alert BBCA 6000`")
+        return
+        
+    res = add_price_alert(sym, price, chat_id)
+    send_reply(chat_id, res["message"])
+
+def handle_alerts_list_cmd(chat_id: str):
+    """Menampilkan daftar alarm harga yang sedang aktif"""
+    alerts = get_user_alerts(chat_id)
+    if not alerts:
+        send_reply(chat_id, "ℹ️ Anda belum memiliki alarm harga yang aktif.\nPasang alarm dengan: `/alert <KODE> <HARGA>` (contoh: `/alert BBCA 6000`).")
+        return
+        
+    msg = "🚨 *DAFTAR ALARM HARGA AKTIF:*\n━━━━━━━━━━━━━━━━━━━━\n"
+    for a in alerts:
+        cond_badge = "Naik ke ≥" if a["condition"] == "GTE" else "Turun ke ≤"
+        msg += f"• *ID #{a['id']}* : `{a['symbol']}` {cond_badge} `{format_idr(a['target_price'])}`\n  _Dibuat di harga: {format_idr(a['created_price'])}_\n"
+    msg += "━━━━━━━━━━━━━━━━━━━━\n_Untuk menghapus alarm, ketik: `/delalert <ID>` (contoh: `/delalert 1`)_"
+    send_reply(chat_id, msg.strip())
+
+def handle_delalert_cmd(chat_id: str, args: list):
+    """Format: /delalert <ID>"""
+    if not args or not args[0].isdigit():
+        send_reply(chat_id, "⚠️ Masukkan ID alarm yang ingin dihapus. Contoh: `/delalert 1`\nKetik `/alerts` untuk melihat daftar ID.")
+        return
+    alert_id = int(args[0])
+    res = delete_price_alert(alert_id, chat_id)
+    send_reply(chat_id, res["message"])
+
+def handle_watch_cmd(chat_id: str, symbol: str):
+    """Format: /watch <KODE>"""
+    if not symbol:
+        send_reply(chat_id, "⚠️ Masukkan kode saham. Contoh: `/watch ANTM`")
+        return
+    res = add_to_watchlist(symbol, chat_id)
+    send_reply(chat_id, res["message"])
+
+def handle_unwatch_cmd(chat_id: str, symbol: str):
+    """Format: /unwatch <KODE>"""
+    if not symbol:
+        send_reply(chat_id, "⚠️ Masukkan kode saham. Contoh: `/unwatch ANTM`")
+        return
+    res = remove_from_watchlist(symbol, chat_id)
+    send_reply(chat_id, res["message"])
+
+def handle_watchlist_cmd(chat_id: str):
+    """Memindai saham-saham pilihan di watchlist pribadi user"""
+    user_list = get_user_watchlist(chat_id)
+    if not user_list:
+        send_reply(chat_id, "ℹ️ Watchlist pribadi Anda masih kosong.\nTambahkan saham favorit dengan: `/watch <KODE>` (contoh: `/watch BBCA`).")
+        return
+        
+    send_reply(chat_id, f"⭐ *Memindai {len(user_list)} saham favorit di Watchlist Anda...*")
+    results = run_screener(watchlist=user_list, send_telegram=False, show_all=True)
+    
+    reply = f"⭐ *HASIL PANTAUAN WATCHLIST PRIBADI ANDA:*\n━━━━━━━━━━━━━━━━━━━━\n"
+    for s in results:
+        close = s['close']
+        sl = round(close * 0.97)
+        tp = round(close * 1.05)
+        buy_min = round(close * 0.99)
+        buy_max = round(close * 1.005)
+        reply += f"""
+📌 *{s['symbol']}* ({s['signal']})
+💵 Harga Now: `{format_idr(close)}` ({s['change_pct']:+.2f}%) | RVol: `{s['rvol']:.2f}x`
+🛒 *Area Beli* : `{format_idr(buy_min)} - {format_idr(buy_max)}`
+🛑 *Stop Loss*  : `{format_idr(sl)}` (-3.0%)
+🎯 *Target TP*  : `{format_idr(tp)}` (+5.0%)
+────────────────────
+"""
+    reply += "_Ketik `/chart KODE` untuk grafik atau `/plan KODE` untuk detail._"
+    send_reply(chat_id, reply.strip())
+
+def handle_calc_cmd(chat_id: str, args: list):
+    """
+    Kalkulator Money Management:
+    Format: /calc <KODE> <RISIKO_RUPIAH>
+    Contoh: /calc BBCA 500000 (Siap rugi maksimal Rp 500.000 jika kena SL)
+    """
+    if len(args) < 2:
+        send_reply(chat_id, "⚠️ *Format salah!*\nGunakan: `/calc <KODE> <MAX_RISIKO_RP>`\nContoh: `/calc BBCA 500000`\n_(Artinya Anda siap rugi maksimal Rp 500.000 jika terkena Stop Loss)_")
+        return
+        
+    sym = args[0].upper()
+    try:
+        max_risk_rp = float(args[1].replace(".", "").replace(",", ""))
+    except ValueError:
+        send_reply(chat_id, "⚠️ Nominal risiko harus berupa angka. Contoh: `/calc BBCA 500000`")
+        return
+        
+    plan = get_trading_plan(sym)
+    if not plan.get("valid"):
+        send_reply(chat_id, f"❌ Gagal memuat data `{sym}`.")
+        return
+        
+    entry = plan["close"]
+    sl = plan["sl_price"]
+    tp2 = plan["tp2"]
+    
+    # Jarak risiko per lembar & per lot
+    risk_per_share = max(entry - sl, 1)
+    risk_per_lot = risk_per_share * 100 # 1 lot = 100 lembar
+    
+    # Hitung rekomendasi lot maksimal
+    recommended_lots = max(int(max_risk_rp // risk_per_lot), 1)
+    shares = recommended_lots * 100
+    total_modal = shares * entry
+    
+    potential_loss = shares * risk_per_share
+    potential_profit = shares * (tp2 - entry)
+    
+    msg = f"""
+🧮 *KALKULATOR MONEY MANAGEMENT: {sym}*
+━━━━━━━━━━━━━━━━━━━━
+🎯 *Toleransi Risiko Anda:* `{format_idr(max_risk_rp)}`
+
+📊 *Parameter Trading Plan:*
+  • *Harga Beli (Entry):* `{format_idr(entry)}`
+  • *Stop Loss (SL):* `{format_idr(sl)}` (-{plan['sl_pct']:.1f}%)
+  • *Target TP 2:* `{format_idr(tp2)}` (+5.0%)
+  • *Jarak Risiko per Lot:* `{format_idr(risk_per_lot)}` / lot
+
+💡 *REKOMENDASI UKURAN POSISI (LOT SIZING):*
+  📦 *Maksimal Beli:* `{recommended_lots} Lot` ({shares:,} lembar)
+  💸 *Total Modal Masuk:* `{format_idr(total_modal)}`
+  
+  🛑 *Maksimal Kerugian (Jika kena SL):* `{format_idr(potential_loss)}`
+  🟢 *Potensi Keuntungan (Jika kena TP2):* `+{format_idr(potential_profit)}`
+  ⚖️ *Risk to Reward:* `1 : {plan['rrr']}`
+━━━━━━━━━━━━━━━━━━━━
+_Klik tombol di bawah untuk langsung membeli sesuai ukuran ideal di atas:_
+"""
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": f"🛒 Beli {recommended_lots} Lot {sym}", "callback_data": f"btn_buy_{sym}_{recommended_lots}"},
+                {"text": f"📊 Lihat Chart {sym}", "callback_data": f"btn_chart_{sym}"}
             ]
         ]
     }
@@ -181,9 +435,8 @@ def handle_scan_cmd(chat_id: str, header_prefix: str = ""):
 ⚖️ *Risk/Reward*      : `1 : {sig['rrr']}`
 ━━━━━━━━━━━━━━━━━━━━
 """
-        reply += "💡 _Gunakan `/plan <KODE>` untuk analisa detail atau `/buy <KODE> <LOT>` untuk membeli._"
+        reply += "💡 _Ketik `/chart KODE` untuk grafik atau `/buy KODE LOT` untuk membeli._"
     else:
-        # Tampilkan top 4 volume tertinggi dengan Trading Plan lengkap
         top_stocks = sorted(results, key=lambda x: x.get('rvol', 0), reverse=True)[:4]
         reply = f"{title}ℹ️ *PEMANTAUAN SAHAM LIKUID IDX TERAKTIF*\n_Belum ada breakout momentum agresif saat ini. Berikut panduan Buy & SL saham bervolume tinggi:_ \n━━━━━━━━━━━━━━━━━━━━\n"
         for s in top_stocks:
@@ -200,7 +453,7 @@ def handle_scan_cmd(chat_id: str, header_prefix: str = ""):
 🎯 *Target TP*  : `{format_idr(tp)}` (+5.0%)
 ────────────────────
 """
-        reply += "💡 _Ketik `/plan <KODE>` untuk Trading Plan lengkap atau `/buy <KODE> <LOT>` untuk membeli._"
+        reply += "💡 _Ketik `/chart KODE` untuk grafik atau `/plan KODE` untuk detail._"
         
     send_reply(chat_id, reply.strip())
 
@@ -284,7 +537,7 @@ def handle_buy_cmd(chat_id: str, args: list):
             f"📦 *Jumlah:* `{res['lots']} Lot` ({res['shares']} lembar)\n"
             f"💵 *Harga Beli (Entry):* `{format_idr(res['price'])}`\n"
             f"💸 *Total Modal:* `{format_idr(res['total_cost'])}`\n\n"
-            f"🛑 *Stop Loss (SL) Aktif:* `{format_idr(res['tp_price'] * 0 + res['sl_price'])}` (-{sl_pct:.1f}%)\n"
+            f"🛑 *Stop Loss (SL) Aktif:* `{format_idr(res['sl_price'])}` (-{sl_pct:.1f}%)\n"
             f"🎯 *Take Profit (TP) Aktif:* `{format_idr(res['tp_price'])}` (+{tp_pct:.1f}%)\n"
             f"🛡️ *Trailing Stop:* Aktif di 2.0%\n"
             f"💰 *Sisa Saldo Kas:* `{format_idr(res['remaining_cash'])}`\n━━━━━━━━━━━━━━━━━━━━"
@@ -328,12 +581,17 @@ def process_callback_query(query: Dict[str, Any]):
         handle_scan_cmd(chat_id)
     elif data == "btn_portfolio":
         handle_portfolio_cmd(chat_id)
+    elif data == "btn_watchlist":
+        handle_watchlist_cmd(chat_id)
     elif data.startswith("btn_plan_"):
         sym = data.replace("btn_plan_", "")
         handle_plan_cmd(chat_id, sym)
-    elif data.startswith("btn_price_"):
-        sym = data.replace("btn_price_", "")
-        handle_price_cmd(chat_id, sym)
+    elif data.startswith("btn_chart_"):
+        sym = data.replace("btn_chart_", "")
+        handle_chart_cmd(chat_id, sym)
+    elif data.startswith("btn_flow_"):
+        sym = data.replace("btn_flow_", "")
+        handle_bandarmology_cmd(chat_id, sym)
     elif data.startswith("btn_buy_"):
         # Format: btn_buy_BBCA_5
         parts = data.split("_")
@@ -345,87 +603,92 @@ def process_callback_query(query: Dict[str, Any]):
         handle_scan_cmd(chat_id, header_prefix="🔔 *UPDATE PASAR SAHAM IDX SAAT INI*")
 
 # ==============================================================================
-# BACKGROUND SCHEDULER: UPDATE OTOMATIS SETIAP JAM BURSA DIBUKA
+# BACKGROUND SCHEDULER: MONITOR HARGA, ALARM, DAN JAM BURSA
 # ==============================================================================
-def market_hours_scheduler():
+def on_alert_triggered(alert: Dict[str, Any], current_price: float):
+    cond_str = "telah naik melampaui" if alert["condition"] == "GTE" else "telah turun menyentuh"
+    msg = f"""
+🚨 *[PRICE ALERT TERPICU!]* ⏰
+━━━━━━━━━━━━━━━━━━━━
+📌 *Saham:* `{alert['symbol']}`
+💵 *Target Harga:* `{format_idr(alert['target_price'])}`
+⚡ *Kondisi:* {cond_str} level target!
+📈 *Harga Terkini:* `{format_idr(current_price)}`
+━━━━━━━━━━━━━━━━━━━━
+_Ketik `/plan {alert['symbol']}` untuk melihat aksi trading plan atau `/buy {alert['symbol']} <LOT>`._
+"""
+    send_reply(alert["chat_id"], msg.strip())
+
+def background_monitoring_loop():
     """
-    Thread latar belakang yang berjalan terus-menerus:
-    Otomatis mengirimkan update screener, Area Beli, dan Stop Loss ke Telegram
-    setiap kali sesi jam perdagangan Bursa Efek Indonesia (IDX) dibuka!
-    
-    Jadwal IDX (Senin - Jumat):
-      - Sesi 1 Buka: 09:05 WIB
-      - Sesi 2 Buka: 13:35 WIB (Jumat: 14:05 WIB)
-      - Pasar Tutup : 16:05 WIB
+    Loop pemantau latar belakang:
+    1. Memeriksa Price Alert setiap 30 detik
+    2. Mengirim update otomatis setiap jam buka/tutup bursa IDX
     """
     token, chat_id = get_credentials()
     if not token or not chat_id:
         return
         
-    print("⏰ [SCHEDULER] Background scheduler jam bursa aktif. Memantau jadwal buka bursa...")
+    print("⏰ [SCHEDULER] Background monitoring loop aktif (Alarm harga & Jam bursa)...")
     last_triggered_key = ""
     
     while True:
         try:
+            # 1. Cek Alarm Harga
+            check_all_alerts(on_alert_triggered)
+            
+            # 2. Cek Jadwal Jam Bursa (WIB)
             now = get_now_wib()
-            weekday = now.weekday() # 0 = Senin, 4 = Jumat, 5-6 = Sabtu-Minggu
+            weekday = now.weekday()
             hour = now.hour
             minute = now.minute
             
-            # Hanya berjalan di hari bursa (Senin - Jumat)
             if weekday < 5:
-                # 1. Buka Sesi 1: 09:05 WIB
+                # Sesi 1 Buka: 09:05 WIB
                 if hour == 9 and 5 <= minute <= 10:
                     slot_key = f"{now.date()}_sesi1_open"
                     if last_triggered_key != slot_key:
                         last_triggered_key = slot_key
-                        print(f"🔔 [{now.strftime('%H:%M:%S')} WIB] Memicu Update Sesi 1 Buka!")
                         header = f"🔔 *[UPDATE BURSA IDX: SESI 1 RESMI DIBUKA - {now.strftime('%H:%M')} WIB]* 🚀\n_Pasar saham baru saja dimulai. Berikut pantauan saham momentum, Area Beli, dan batas Stop Loss:_"
                         handle_scan_cmd(chat_id, header_prefix=header)
 
-                # 2. Buka Sesi 2: 
-                # - Senin s/d Kamis: 13:35 WIB
-                # - Jumat: 14:05 WIB
+                # Sesi 2 Buka: 13:35 WIB (Senin-Kamis) atau 14:05 WIB (Jumat)
                 is_sesi2_open = (weekday < 4 and hour == 13 and 35 <= minute <= 40) or (weekday == 4 and hour == 14 and 5 <= minute <= 10)
                 if is_sesi2_open:
                     slot_key = f"{now.date()}_sesi2_open"
                     if last_triggered_key != slot_key:
                         last_triggered_key = slot_key
-                        print(f"🔔 [{now.strftime('%H:%M:%S')} WIB] Memicu Update Sesi 2 Buka!")
                         header = f"🔔 *[UPDATE BURSA IDX: SESI 2 RESMI DIBUKA - {now.strftime('%H:%M')} WIB]* 📈\n_Perdagangan sesi siang dimulai. Berikut saham dengan akumulasi volume terbesar:_"
                         handle_scan_cmd(chat_id, header_prefix=header)
 
-                # 3. Penutupan Pasar: 16:05 WIB
+                # Penutupan Pasar: 16:05 WIB
                 if hour == 16 and 5 <= minute <= 10:
                     slot_key = f"{now.date()}_market_close"
                     if last_triggered_key != slot_key:
                         last_triggered_key = slot_key
-                        print(f"🔔 [{now.strftime('%H:%M:%S')} WIB] Memicu Update Penutupan Pasar (EOD)!")
                         header = f"🔔 *[EOD: PENUTUPAN BURSA EFEK INDONESIA - {now.strftime('%H:%M')} WIB]* 🏁\n_Ringkasan penutupan pasar hari ini & saham terbaik untuk watchlist besok:_"
                         handle_scan_cmd(chat_id, header_prefix=header)
                         
-            # Cek setiap 30 detik
             time.sleep(30)
         except Exception as e:
-            print(f"⚠️ Error scheduler: {e}")
+            print(f"⚠️ Error scheduler loop: {e}")
             time.sleep(30)
 
 def start_interactive_listener():
     """
-    Menjalankan background long-polling untuk merespons pesan Telegram secara realtime,
-    sekaligus mengaktifkan auto-scheduler jam buka bursa.
+    Menjalankan background long-polling untuk merespons perintah Telegram secara realtime.
     """
     token, chat_id = get_credentials()
     if not token or not chat_id:
         print("❌ Token Telegram atau Chat ID belum dikonfigurasi.")
         return
 
-    # Mulai thread scheduler jam bursa di latar belakang
-    sched_thread = threading.Thread(target=market_hours_scheduler, daemon=True)
+    # Mulai thread scheduler & alarm di background
+    sched_thread = threading.Thread(target=background_monitoring_loop, daemon=True)
     sched_thread.start()
 
     print(f"🤖 Bot Telegram @bilnabil_bot sedang aktif mendengarkan perintah...")
-    print("⏰ Update otomatis jam buka bursa (09:05 & 13:35 WIB) telah DIAKTIFKAN.")
+    print("⏰ Fitur Lengkap: Chart, Price Alert, Bandarmology, Watchlist, & Money Management aktif!")
     print("Tekan Ctrl+C untuk menghentikan.\n")
     
     offset = None
@@ -465,12 +728,34 @@ def start_interactive_listener():
                     handle_start(sender_chat_id, first_name)
                 elif cmd in ["/scan", "scan"]:
                     handle_scan_cmd(sender_chat_id)
+                elif cmd.startswith("/chart"):
+                    sym = cmd_args[0] if cmd_args else "BBCA"
+                    handle_chart_cmd(sender_chat_id, sym)
                 elif cmd.startswith("/plan"):
                     sym = cmd_args[0] if cmd_args else "BBCA"
                     handle_plan_cmd(sender_chat_id, sym)
                 elif cmd.startswith("/price"):
                     sym = cmd_args[0] if cmd_args else "BBCA"
                     handle_price_cmd(sender_chat_id, sym)
+                elif cmd.startswith("/flow") or cmd.startswith("/bandar"):
+                    sym = cmd_args[0] if cmd_args else "BBCA"
+                    handle_bandarmology_cmd(sender_chat_id, sym)
+                elif cmd.startswith("/calc"):
+                    handle_calc_cmd(sender_chat_id, cmd_args)
+                elif cmd.startswith("/alert") and not cmd.startswith("/alerts"):
+                    handle_alert_cmd(sender_chat_id, cmd_args)
+                elif cmd in ["/alerts", "alerts"]:
+                    handle_alerts_list_cmd(sender_chat_id)
+                elif cmd.startswith("/delalert"):
+                    handle_delalert_cmd(sender_chat_id, cmd_args)
+                elif cmd.startswith("/watch") and not cmd.startswith("/watchlist"):
+                    sym = cmd_args[0] if cmd_args else ""
+                    handle_watch_cmd(sender_chat_id, sym)
+                elif cmd.startswith("/unwatch"):
+                    sym = cmd_args[0] if cmd_args else ""
+                    handle_unwatch_cmd(sender_chat_id, sym)
+                elif cmd in ["/watchlist", "/mywatch", "watchlist", "mywatch"]:
+                    handle_watchlist_cmd(sender_chat_id)
                 elif cmd in ["/update", "update"]:
                     handle_scan_cmd(sender_chat_id, header_prefix="🔔 *UPDATE MANUAL PASAR SAHAM IDX*")
                 elif cmd in ["/portfolio", "portfolio"]:

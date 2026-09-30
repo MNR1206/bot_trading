@@ -1,142 +1,84 @@
-# 🤖 Bot Trading Saham Indonesia (IDX / BEI)
+# 🤖 Bot Trading Saham Indonesia (IDX / BEI) - Edisi Pro
 
-Aplikasi bot trading kuantitatif modular untuk Bursa Efek Indonesia (IDX) yang berfokus pada strategi **Momentum & Volume Spike Scanner**. Dilengkapi dengan fitur **Screener Otomatis**, **Backtesting Engine Historis**, **Simulasi Akun Paper Trading (Virtual Rupiah)**, dan integrasi **Notifikasi Telegram Bot**.
-
----
-
-## 🌟 Fitur Utama
-
-1. **🔍 Screener Saham IDX Real-Time / EOD**:
-   - Pemindaian multi-threaded super cepat pada puluhan hingga ratusan saham likuid (LQ45, IDX30, Kompas100).
-   - Deteksi lonjakan volume akumulasi (**Relative Volume / RVol $\ge 1.5\times$** rata-rata 20 hari).
-   - Konfirmasi momentum harga positif ($\ge +1.5\%$), tren di atas MA20, dan breakout resistance 20 hari.
-   - Filter likuiditas ketat (Turnover transaksi harian $\ge$ Rp 2 Miliar) untuk menghindari saham tidak likuid atau "gorengan" berisiko tinggi.
-
-2. **📊 Mesin Backtesting Realistis**:
-   - Simulasi strategi pada data historis saham IDX (1 bulan hingga 2 tahun).
-   - Memperhitungkan aturan bursa nyata: satuan **1 Lot = 100 Lembar**, biaya beli sekuritas (0.15%), dan biaya jual + PPh Final (0.25%).
-   - Metrik finansial komprehensif: **Win Rate (%)**, **Net Profit (Rp & %)**, **Profit Factor**, **Maximum Drawdown (%)**, dan log transaksi detail.
-
-3. **💼 Paper Trading Portfolio (Simulasi Akun Virtual)**:
-   - Modal awal virtual: **Rp 50.000.000** (dapat diubah sesuai preferensi).
-   - Manajemen posisi terbuka (Open Positions) dan riwayat transaksi (Trade History) yang tersimpan permanen di `portfolio.json`.
-   - Pengawalan otomatis dengan **Target Take Profit (+5%)**, **Stop Loss (-3%)**, dan **Trailing Stop dinamis (2%)**.
-
-4. **📱 Notifikasi Telegram Interaktif**:
-   - Kirim alert langsung ke smartphone saat sinyal beli (BUY/STRONG BUY) terdeteksi.
-   - Notifikasi eksekusi order beli dan jual paper trading lengkap dengan detail harga, lot, dan realized PnL.
+Aplikasi bot trading kuantitatif modular untuk Bursa Efek Indonesia (IDX) yang berfokus pada strategi **Momentum & Volume Spike Accumulation**. Dilengkapi dengan fitur **Screener Otomatis**, **Backtesting Engine Historis**, **Simulasi Akun Paper Trading (Virtual Rupiah)**, **Grafik Candlestick Visual**, **Price Alert**, **Deteksi Bandarmology**, dan integrasi **Bot Telegram Interaktif 2-Arah**.
 
 ---
 
-## 📁 Struktur Direktori
+## 🌟 Fitur-Fitur Unggulan
 
-```
-bot_trading/
-├── config.py             # Konfigurasi parameter strategi, watchlist IDX, fee bursa, & token Telegram
-├── data_provider.py      # Pengambil data harga saham IDX (Yahoo Finance) dengan in-memory caching
-├── strategy.py           # Algoritma perhitungan indikator (RVol, MA, RSI, ATR) & sinyal Momentum
-├── screener.py           # Pemindai saham paralel multi-threading & tabel hasil
-├── backtester.py         # Mesin simulasi historis & evaluasi performa strategi
-├── paper_trader.py       # Manajer portofolio virtual (Beli, Jual, Auto-update TP/SL, Saldo Rupiah)
-├── telegram_notifier.py  # Modul pengiriman notifikasi via Telegram Bot API
-├── main.py               # Antarmuka CLI interaktif & pemantau otomatis (Monitoring Loop)
-├── portfolio.json        # Database lokal portofolio virtual (dibuat otomatis)
-├── requirements.txt      # Daftar dependensi Python
-├── .env.example          # Contoh template konfigurasi token Telegram
-└── README.md             # Dokumentasi panduan lengkap
-```
+1. **📊 Grafik Candlestick Visual Otomatis (`/chart <KODE>`)**:
+   - Menghasilkan dan mengirimkan gambar grafik candlestick berlatar gelap (*dark mode*) langsung ke Telegram.
+   - Dilengkapi garis tren **MA20 & MA50**, garis **Entry**, batas hijau **Target TP (+5%)**, batas merah **Stop Loss (-3%)**, serta bar volume.
+
+2. **🚨 Alarm Pengingat Harga / Price Alert (`/alert <KODE> <HARGA>`)**:
+   - Pasang alarm harga untuk saham incaran (contoh: `/alert BBCA 6000`).
+   - Bot otomatis memantau harga setiap 30 detik dan membunyikan alarm instan begitu target tersentuh!
+
+3. **🌐 Analisis Arus Dana & Bandarmology (`/flow <KODE>`)**:
+   - Mendeteksi aliran dana pemain besar (*Smart Money / Bandar*):
+     - **Chaikin Money Flow (CMF 20)**: Mengukur tekanan akumulasi/distribusi.
+     - **On-Balance Volume (OBV)** & arah tren akumulasi.
+     - **Skor Akumulasi (0 - 100)**: Menentukan status *Akumulasi Masif*, *Netral*, atau *Distribusi/Dumping*.
+
+4. **⭐ Watchlist Saham Favorit Pribadi (`/watch` & `/watchlist`)**:
+   - Simpan saham-saham pilihan pribadi Anda secara persisten.
+   - Ketik `/watchlist` untuk memindai hanya saham-saham favorit Anda.
+
+5. **🧮 Kalkulator Money Management & Lot Sizing (`/calc <KODE> <RISIKO>`)**:
+   - Hitung ukuran lot ideal berdasarkan risiko rupiah yang siap Anda tanggung (contoh: `/calc BBCA 500000`).
+   - Bot otomatis menghitung jarak Stop Loss, merekomendasikan jumlah lot maksimal, total modal yang dibutuhkan, dan potensi profit di TP2.
+
+6. **🎯 Rekomendasi Area Beli & Stop Loss (SL) yang Presisi**:
+   - Menghitung rentang harga masuk ideal (*Entry Zone*), level ketat cut loss (*Stop Loss*), dan target cuan bertahap (*TP1, TP2, TP3*).
+
+7. **⏰ Auto-Scheduler Jam Buka Bursa (WIB)**:
+   - Bot otomatis menyaring saham dan mengirim update ke Telegram setiap sesi bursa IDX dibuka:
+     - **Sesi 1 Pagi:** 09:05 WIB
+     - **Sesi 2 Siang:** 13:35 WIB *(Jumat: 14:05 WIB)*
+     - **Pasar Tutup:** 16:05 WIB
+
+8. **💼 Paper Trading Virtual Account (Rp 50.000.000)**:
+   - Simulasi jual beli saham dengan aturan resmi BEI (**1 Lot = 100 lembar**), fee beli 0.15%, fee jual 0.25%, dan pengawalan otomatis Trailing Stop 2%.
+
+---
+
+## 📱 Daftar Perintah Chat Telegram (@bilnabil_bot)
+
+| Perintah | Fungsi | Contoh Penggunaan |
+| :--- | :--- | :--- |
+| **`/start`** / **`/help`** | Buka menu navigasi & tombol klik interaktif | `/start` |
+| **`/scan`** | Pindai saham IDX dengan lonjakan volume & SL/TP | `/scan` |
+| **`/plan <KODE>`** | Lihat Trading Plan lengkap (Buy, SL, TP, RRR) | `/plan BBCA` |
+| **`/chart <KODE>`** | Kirim gambar grafik candlestick + MA + TP/SL | `/chart BBCA` |
+| **`/alert <KODE> <HARGA>`**| Pasang alarm pengingat harga otomatis | `/alert BBCA 6000` |
+| **`/alerts`** | Lihat daftar alarm harga yang sedang aktif | `/alerts` |
+| **`/delalert <ID>`** | Hapus alarm harga tertentu | `/delalert 1` |
+| **`/flow <KODE>`** | Analisis arus dana asing & Bandarmology | `/flow BMRI` |
+| **`/calc <KODE> <RISIKO>`**| Kalkulator ukuran lot ideal sesuai batas rugi | `/calc BBCA 500000` |
+| **`/watch <KODE>`** | Tambah saham ke watchlist favorit pribadi | `/watch ANTM` |
+| **`/unwatch <KODE>`** | Hapus saham dari watchlist | `/unwatch ANTM` |
+| **`/watchlist`** | Pantau khusus saham-saham favorit Anda | `/watchlist` |
+| **`/buy <KODE> <LOT> [TP] [SL]`** | Beli saham simulasi (kustom TP/SL opsional) | `/buy BBCA 5 5 3` |
+| **`/sell <KODE> [LOT]`**| Jual saham dari portofolio simulasi | `/sell BBCA 5` |
+| **`/portfolio`** | Cek saldo kas tunai & floating PnL saham | `/portfolio` |
+| **`/update`** | Paksa kirim update kondisi bursa saat ini | `/update` |
 
 ---
 
 ## 🚀 Cara Menjalankan
 
-### 1. Instalasi Dependensi
-Pastikan Python 3.10+ sudah terinstal di komputer Anda, lalu jalankan:
-```bash
-pip install -r requirements.txt
+### Menjalankan Bot Telegram Interaktif:
+```powershell
+python bot_telegram.py
 ```
+*Bot akan aktif mendengarkan perintah dari Telegram, mengecek alarm harga setiap 30 detik, dan otomatis mengirim laporan saat bursa dibuka (09:05 & 13:35 WIB).*
 
-### 2. Menjalankan Menu Interaktif (CLI Utama)
-Jalankan file `main.py` untuk membuka menu navigasi lengkap:
-```bash
+### Menjalankan CLI Interaktif di Laptop:
+```powershell
 python main.py
 ```
 
-Tampilan menu utama:
+### Menjalankan Screener Manual:
+```powershell
+python main.py --scan
 ```
-╔═══════════════════════════════════════════════════════════════╗
-║         🤖 BOT TRADING SAHAM INDONESIA (IDX / BEI)           ║
-║       Strategi: Momentum & Volume Spike Accumulation          ║
-║      Fitur: Screener + Backtest + Paper Trading + Telegram    ║
-╚═══════════════════════════════════════════════════════════════╝
-
-Silakan pilih menu:
-  [1] 🔍 Jalankan Screener Saham Momentum & Volume Spike (LQ45 / Populer)
-  [2] 📊 Backtest Strategi pada Saham Historis (Uji Win Rate & PnL)
-  [3] 💼 Lihat Portofolio Paper Trading (Virtual Account)
-  [4] 🛒 Beli Saham (Paper Trading Order)
-  [5] 💰 Jual Saham (Paper Trading Order)
-  [6] 🔄 Cek & Update TP / SL / Trailing Stop Posisi Terbuka
-  [7] 🤖 Jalankan Auto-Monitoring Loop (Pemantau Otomatis Berkala)
-  [8] 📱 Cek Status & Tes Notifikasi Telegram
-  [9] ⚙️  Reset Saldo Portofolio Paper Trading
-  [0] ❌ Keluar
-```
-
----
-
-## ⚡ Perintah Cepat (Direct CLI Flags)
-
-Anda juga dapat menjalankan perintah bot secara langsung tanpa melalui menu interaktif:
-
-* **Menjalankan Screener Saham:**
-  ```bash
-  python main.py --scan
-  ```
-
-* **Menjalankan Backtest Saham Tertentu (misal: BBCA, ANTM, BRIS, MEDC):**
-  ```bash
-  python main.py --backtest BBCA
-  python main.py --backtest ANTM
-  ```
-
-* **Melihat Status Portofolio Paper Trading:**
-  ```bash
-  python main.py --portfolio
-  ```
-
-* **Menjalankan Pemantau Otomatis (Auto-Monitoring Loop setiap 60 detik):**
-  ```bash
-  python main.py --monitor --interval 60
-  ```
-
----
-
-## 📲 Panduan Konfigurasi Notifikasi Telegram
-
-Untuk menerima alert sinyal di HP melalui Telegram:
-
-1. Buka aplikasi Telegram dan cari bot **`@BotFather`**.
-2. Ketik `/newbot`, ikuti petunjuk, lalu salin **HTTP API Token** yang diberikan.
-3. Cari bot **`@userinfobot`** di Telegram untuk melihat **Chat ID** akun Anda.
-4. Buat file baru bernama `.env` di dalam folder `bot_trading` (atau salin dari `.env.example`):
-   ```env
-   TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRstuVWXyz
-   TELEGRAM_CHAT_ID=987654321
-   ```
-5. Buka `main.py` -> pilih menu **[8]** untuk menguji koneksi dan memastikan pesan tes masuk ke Telegram Anda.
-
----
-
-## 📐 Aturan & Mekanisme Bursa Efek Indonesia (IDX)
-
-Bot ini telah disesuaikan dengan regulasi perdagangan saham di Indonesia:
-- **Satuan Lot**: 1 Lot = 100 Lembar saham. Pembelian harus berupa kelipatan 100 lembar.
-- **Biaya Beli**: Disimulasikan 0.15% (Biaya broker + pungutan bursa/levy + PPN).
-- **Biaya Jual**: Disimulasikan 0.25% (Biaya broker + levy + PPN + PPh Final 0.1%).
-- **Ticker Yahoo Finance**: Simbol saham otomatis dikonversi dengan akhiran `.JK` (contoh: `BBCA` otomatis menjadi `BBCA.JK`).
-
----
-
-## ⚠️ Disclaimer
-Aplikasi ini ditujukan untuk analisis teknikal, edukasi kuantitatif, dan simulasi strategi trading. Segala keputusan transaksi investasi di pasar modal adalah tanggung jawab pribadi masing-masing (Do Your Own Research / DYOR).

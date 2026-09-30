@@ -37,6 +37,34 @@ def send_telegram_message(message: str, parse_mode: str = "Markdown") -> bool:
         print(f"⚠️ Gagal mengirim pesan ke Telegram: {e}")
         return False
 
+def send_telegram_photo(photo_path: str, caption: str = "", reply_markup: Optional[Dict[str, Any]] = None, parse_mode: str = "Markdown") -> bool:
+    """
+    Mengirim gambar/foto ke Telegram menggunakan endpoint sendPhoto resmi.
+    """
+    token, chat_id = get_credentials()
+    if not token or not chat_id:
+        return False
+        
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    data = {
+        "chat_id": chat_id,
+        "caption": caption,
+        "parse_mode": parse_mode
+    }
+    if reply_markup:
+        import json
+        data["reply_markup"] = json.dumps(reply_markup)
+        
+    try:
+        with open(photo_path, "rb") as photo_file:
+            files = {"photo": photo_file}
+            response = requests.post(url, data=data, files=files, timeout=25)
+            return response.status_code == 200
+    except Exception as e:
+        print(f"⚠️ Gagal mengirim foto ke Telegram: {e}")
+        return False
+
+
 def notify_buy_signal(signal_data: Dict[str, Any], symbol: str) -> bool:
     """
     Format dan kirim notifikasi sinyal BUY / Momentum Spike.
