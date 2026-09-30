@@ -142,3 +142,61 @@ def analyze_ticker_momentum(df: pd.DataFrame) -> Dict[str, Any]:
         "rrr": rrr,
         "reasons": reasons
     }
+
+def get_trading_plan(ticker: str, custom_tp_pct: Optional[float] = None, custom_sl_pct: Optional[float] = None) -> Dict[str, Any]:
+    """
+    Menghitung Trading Plan lengkap untuk suatu saham:
+    - Area Beli (Entry Area)
+    - Level Stop Loss (SL)
+    - Target Profit (TP1, TP2, TP3)
+    - Support & Resistance
+    - Risk to Reward Ratio
+    """
+    from data_provider import get_stock_data, get_clean_symbol
+    symbol = get_clean_symbol(ticker)
+    df = get_stock_data(ticker, period="3mo", interval="1d")
+    if df.empty or len(df) < 20:
+        return {"valid": False, "symbol": symbol, "error": "Data historis tidak mencukupi"}
+    
+    analysis = analyze_ticker_momentum(df)
+    close = analysis['close']
+    tp_pct = custom_tp_pct or DEFAULT_TP2_PCT
+    sl_pct = custom_sl_pct or DEFAULT_SL_PCT
+    
+    support = round(float(df['Low'].tail(15).min()))
+    resistance = round(float(df['High'].tail(20).max()))
+    
+    buy_min = round(close * 0.99)
+    buy_max = round(close * 1.005)
+    
+    sl_price = round(close * (1 - sl_pct / 100))
+    tp1 = round(close * (1 + DEFAULT_TP1_PCT / 100))
+    tp2 = round(close * (1 + tp_pct / 100))
+    tp3 = round(close * (1 + DEFAULT_TP3_PCT / 100))
+    
+    risk = max(close - sl_price, 1)
+    reward = max(tp2 - close, 0)
+    rrr = round(reward / risk, 2)
+    
+    return {
+        "valid": True,
+        "symbol": symbol,
+        "close": close,
+        "change_pct": analysis['change_pct'],
+        "rvol": analysis['rvol'],
+        "rsi": analysis['rsi'],
+        "signal": analysis['signal'],
+        "buy_entry_ideal": close,
+        "buy_min": buy_min,
+        "buy_max": buy_max,
+        "sl_price": sl_price,
+        "sl_pct": sl_pct,
+        "tp1": tp1,
+        "tp2": tp2,
+        "tp3": tp3,
+        "support": support,
+        "resistance": resistance,
+        "rrr": rrr,
+        "reasons": analysis.get('reasons', [])
+    }
+
