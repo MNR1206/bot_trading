@@ -27,7 +27,15 @@ from data_provider import get_stock_data, get_clean_symbol
 from strategy import get_trading_plan
 
 CHARTS_DIR = Path(__file__).resolve().parent / "charts"
-CHARTS_DIR.mkdir(exist_ok=True)
+try:
+    CHARTS_DIR.mkdir(exist_ok=True)
+except Exception:
+    import tempfile
+    CHARTS_DIR = Path(tempfile.gettempdir()) / "charts"
+    try:
+        CHARTS_DIR.mkdir(exist_ok=True)
+    except Exception:
+        pass
 
 def generate_candlestick_chart(ticker: str, period: str = "3mo") -> Optional[str]:
     """

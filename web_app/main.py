@@ -54,11 +54,31 @@ app.add_middleware(
 
 TEMPLATES_DIR = Path(__file__).resolve().parent / "templates"
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-STATIC_DIR.mkdir(parents=True, exist_ok=True)
-TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
-templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+try:
+    STATIC_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
+try:
+    TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
+except Exception:
+    pass
+
+if STATIC_DIR.exists():
+    try:
+        app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+    except Exception:
+        pass
+
+# Cari template directory yang valid baik di environment lokal maupun Vercel serverless
+possible_template_dirs = [
+    TEMPLATES_DIR,
+    BASE_DIR / "web_app" / "templates",
+    Path("/var/task/web_app/templates"),
+]
+valid_template_dir = next((d for d in possible_template_dirs if d.exists()), TEMPLATES_DIR)
+templates = Jinja2Templates(directory=str(valid_template_dir))
 
 class PaperOrderRequest(BaseModel):
     symbol: str
@@ -75,7 +95,19 @@ class AlertRequest(BaseModel):
 # Gunakan def (BUKAN async def) agar FastAPI menjalankan I/O di thread pool terpisah tanpa memblokir event loop!
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    try:
+        return templates.TemplateResponse("index.html", {"request": request})
+    except Exception as e:
+        # Fallback langsung baca file jika Jinja2 template loader berbeda di runtime Vercel
+        html_paths = [
+            Path(__file__).resolve().parent / "templates" / "index.html",
+            BASE_DIR / "web_app" / "templates" / "index.html",
+            Path("/var/task/web_app/templates/index.html")
+        ]
+        for p in html_paths:
+            if p.exists():
+                return HTMLResponse(content=p.read_text(encoding="utf-8"))
+        return HTMLResponse(content=f"<h1>Error loading template: {e}</h1>", status_code=500)
 
 # ----------------- API OVERVIEW & KPI (Cepat & Non-Blocking) -----------------
 @app.get("/api/overview")
