@@ -1,0 +1,1543 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IDX Smart Trading Terminal | Quant & Bandar Radar</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- TradingView Lightweight Charts CDN Pinned to v4.2.1 -->
+  <script src="https://unpkg.com/lightweight-charts@4.2.1/dist/lightweight-charts.standalone.production.js"></script>
+  <!-- TradingView Official Advanced Widget Script -->
+  <script type="text/javascript" src="https://s3.tradingview.com/tv.js"></script>
+  <!-- Google Fonts: Inter & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            terminal: {
+              950: '#070b13',
+              900: '#0f172a',
+              850: '#141e33',
+              800: '#1e293b',
+              700: '#334155',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #070b13;
+      color: #e2e8f0;
+      font-family: 'Inter', sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+    .glow-green {
+      box-shadow: 0 0 15px -3px rgba(16, 185, 129, 0.25);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col custom-scrollbar">
+
+  <!-- TOPBAR / NAVBAR -->
+  <header class="bg-terminal-950/95 border-b border-terminal-800/80 sticky top-0 z-40 backdrop-blur-md px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-md">
+    <div class="flex items-center gap-3">
+      <div class="w-9 h-9 rounded-lg bg-gradient-to-tr from-sky-500 to-emerald-500 flex items-center justify-center shadow-lg font-bold text-white text-lg">
+        ⚡
+      </div>
+      <div>
+        <div class="flex items-center gap-2">
+          <span class="font-extrabold tracking-tight text-white text-base">IDX SMART TRADING</span>
+          <span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-sky-500/20 text-sky-400 border border-sky-500/30">PRO TERMINAL</span>
+        </div>
+        <p class="text-[11px] text-slate-400">Quantitative Screener • Bandar Hunter • Live Charts</p>
+      </div>
+    </div>
+
+    <!-- Ticker Banner Bar -->
+    <div id="crypto-strip" class="hidden md:flex items-center gap-4 text-xs font-mono bg-terminal-900/80 px-3 py-1.5 rounded-lg border border-terminal-800">
+      <span class="text-slate-400">Loading Market Rates...</span>
+    </div>
+
+    <!-- Actions & Clock -->
+    <div class="flex items-center gap-3">
+      <button onclick="refreshCurrentTab(true)" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-terminal-800 hover:bg-terminal-700 text-xs font-medium text-slate-200 border border-terminal-700 transition">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span>Refresh Data</span>
+      </button>
+      <div id="live-clock" class="font-mono text-xs text-sky-400 bg-sky-950/40 border border-sky-800/40 px-2.5 py-1.5 rounded-lg">
+        --:--:-- WIB
+      </div>
+    </div>
+  </header>
+
+  <!-- NAVIGATION TABS -->
+  <nav class="bg-terminal-900/90 border-b border-terminal-800/80 px-4 flex items-center gap-1 overflow-x-auto custom-scrollbar text-xs font-medium">
+    <button onclick="switchTab('overview')" id="tab-btn-overview" class="tab-btn px-4 py-3 flex items-center gap-2 border-b-2 border-sky-500 text-sky-400 transition whitespace-nowrap">
+      📊 <span>Market Overview</span>
+    </button>
+    <button onclick="switchTab('chart')" id="tab-btn-chart" class="tab-btn px-4 py-3 flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+      📈 <span>Interactive Chart</span>
+    </button>
+    <button onclick="switchTab('bandar')" id="tab-btn-bandar" class="tab-btn px-4 py-3 flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+      🦈 <span>Bandar Hunter</span>
+    </button>
+    <button onclick="switchTab('breakout')" id="tab-btn-breakout" class="tab-btn px-4 py-3 flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+      🚀 <span>Volume Breakout</span>
+    </button>
+    <button onclick="switchTab('sektor')" id="tab-btn-sektor" class="tab-btn px-4 py-3 flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+      🗺️ <span>Sektor Heatmap</span>
+    </button>
+    <button onclick="switchTab('swing')" id="tab-btn-swing" class="tab-btn px-4 py-3 flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+      🎯 <span>Swing & BoW</span>
+    </button>
+    <button onclick="switchTab('crypto')" id="tab-btn-crypto" class="tab-btn px-4 py-3 flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+      🪙 <span>Crypto & Forex</span>
+    </button>
+    <button onclick="switchTab('portfolio')" id="tab-btn-portfolio" class="tab-btn px-4 py-3 flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+      💼 <span>Paper Trading</span>
+    </button>
+    <button onclick="switchTab('alerts')" id="tab-btn-alerts" class="tab-btn px-4 py-3 flex items-center gap-2 border-b-2 border-transparent text-slate-400 hover:text-slate-200 transition whitespace-nowrap">
+      🔔 <span>Price Alerts</span>
+    </button>
+  </nav>
+
+  <!-- MAIN VIEWPORT CONTAINER -->
+  <main class="flex-1 p-4 max-w-7xl w-full mx-auto space-y-6">
+
+    <!-- ==================== TAB 1: OVERVIEW ==================== -->
+    <section id="tab-overview" class="tab-content space-y-6">
+      <!-- Top Metric Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <!-- Equity Card -->
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 relative overflow-hidden">
+          <div class="text-xs text-slate-400 font-medium">Virtual Portfolio Equity</div>
+          <div id="stat-equity" class="text-2xl font-bold font-mono text-white mt-1">Rp 100,000,000</div>
+          <div id="stat-pnl" class="text-xs font-mono text-emerald-400 mt-1 flex items-center gap-1">
+            <span>+Rp 0 (0.00%)</span>
+          </div>
+          <div class="absolute right-3 top-3 text-slate-700 text-3xl">💼</div>
+        </div>
+
+        <!-- Leader Sektor Card -->
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 relative overflow-hidden">
+          <div class="text-xs text-slate-400 font-medium">Sektor Pemimpin Hari Ini</div>
+          <div id="stat-leader-sektor" class="text-lg font-bold text-sky-400 mt-1 truncate">Memuat Sektor...</div>
+          <div id="stat-leader-chg" class="text-xs font-mono text-emerald-400 mt-1">+0.00% avg gain</div>
+          <div class="absolute right-3 top-3 text-slate-700 text-3xl">🧭</div>
+        </div>
+
+        <!-- Top Bandar Pick Card -->
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 relative overflow-hidden">
+          <div class="text-xs text-slate-400 font-medium">Top Bandar Accumulation</div>
+          <div id="stat-bandar-top" class="text-lg font-bold text-emerald-400 mt-1">Scanning...</div>
+          <div id="stat-bandar-score" class="text-xs font-mono text-slate-300 mt-1">Skor: --/100</div>
+          <div class="absolute right-3 top-3 text-slate-700 text-3xl">🦈</div>
+        </div>
+
+        <!-- Top Breakout Card -->
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 relative overflow-hidden">
+          <div class="text-xs text-slate-400 font-medium">Top Volume Spike (Breakout)</div>
+          <div id="stat-breakout-top" class="text-lg font-bold text-amber-400 mt-1">Scanning...</div>
+          <div id="stat-breakout-rvol" class="text-xs font-mono text-slate-300 mt-1">RVol: --x</div>
+          <div class="absolute right-3 top-3 text-slate-700 text-3xl">⚡</div>
+        </div>
+      </div>
+
+      <!-- Quick Highlights Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Bandar Radar Mini Table -->
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">
+              <span>🦈</span> <span>Top Akumulasi Bandar Hari Ini</span>
+            </h3>
+            <button onclick="switchTab('bandar')" class="text-xs text-sky-400 hover:text-sky-300 transition">Lihat Semua →</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead>
+                <tr class="text-slate-400 border-b border-terminal-800 pb-2">
+                  <th class="py-2">EMITEN</th>
+                  <th>HARGA</th>
+                  <th>CHANGE</th>
+                  <th>SKOR BANDAR</th>
+                  <th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="overview-bandar-list" class="divide-y divide-terminal-800/60 font-mono">
+                <tr><td colspan="5" class="py-4 text-center text-slate-500">Memuat data akumulasi...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Breakout Radar Mini Table -->
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-5 space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="font-bold text-sm text-slate-200 flex items-center gap-2">
+              <span>🚀</span> <span>Top Lonjakan Volume (Breakout)</span>
+            </h3>
+            <button onclick="switchTab('breakout')" class="text-xs text-sky-400 hover:text-sky-300 transition">Lihat Semua →</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs text-left">
+              <thead>
+                <tr class="text-slate-400 border-b border-terminal-800 pb-2">
+                  <th class="py-2">EMITEN</th>
+                  <th>HARGA</th>
+                  <th>CHANGE</th>
+                  <th>RVOL RATIO</th>
+                  <th>ACTION</th>
+                </tr>
+              </thead>
+              <tbody id="overview-breakout-list" class="divide-y divide-terminal-800/60 font-mono">
+                <tr><td colspan="5" class="py-4 text-center text-slate-500">Memuat data breakout...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 2: LIVE CHART & TECHNICAL ==================== -->
+    <section id="tab-chart" class="tab-content hidden space-y-4">
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+        <!-- Stock Symbol Selector & Search -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-xs text-slate-400 font-semibold uppercase">Emiten:</label>
+          <div class="relative">
+            <input type="text" id="chart-symbol-input" value="BBCA" placeholder="Cth: BBCA, BTC, XAU..." 
+                   class="bg-terminal-950 border border-terminal-700 rounded-lg px-3 py-1.5 text-sm font-mono uppercase text-white focus:outline-none focus:border-sky-500 w-32">
+          </div>
+          <button onclick="loadChartForSymbol()" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium text-white transition">
+            Load Chart
+          </button>
+          <!-- Quick Picks -->
+          <div class="flex items-center gap-1.5 ml-1">
+            <button onclick="quickSelectChart('BBCA')" class="px-2 py-1 rounded bg-terminal-800 hover:bg-terminal-700 text-[11px] font-mono text-slate-300">BBCA</button>
+            <button onclick="quickSelectChart('BBRI')" class="px-2 py-1 rounded bg-terminal-800 hover:bg-terminal-700 text-[11px] font-mono text-slate-300">BBRI</button>
+            <button onclick="quickSelectChart('ANTM')" class="px-2 py-1 rounded bg-terminal-800 hover:bg-terminal-700 text-[11px] font-mono text-slate-300">ANTM</button>
+            <button onclick="quickSelectChart('BTC')" class="px-2 py-1 rounded bg-terminal-800 hover:bg-terminal-700 text-[11px] font-mono text-slate-300">BTC</button>
+            <button onclick="quickSelectChart('XAU')" class="px-2 py-1 rounded bg-terminal-800 hover:bg-terminal-700 text-[11px] font-mono text-slate-300">GOLD</button>
+          </div>
+        </div>
+
+        <!-- Mode Toggle: Lightweight vs TradingView Widget -->
+        <div class="flex items-center gap-1 bg-terminal-950 p-1 rounded-lg border border-terminal-700 text-xs">
+          <button id="btn-chart-mode-lw" onclick="switchChartEngine('lightweight')" class="px-2.5 py-1 rounded font-medium bg-sky-600 text-white transition">
+            📊 Candlestick MA
+          </button>
+          <button id="btn-chart-mode-tv" onclick="switchChartEngine('tradingview')" class="px-2.5 py-1 rounded font-medium text-slate-400 hover:text-white transition">
+            🌐 TradingView Pro
+          </button>
+        </div>
+
+        <!-- Price Header Indicator & AI Trigger Button -->
+        <div class="flex items-center gap-3">
+          <div id="chart-info-bar" class="flex items-center gap-2 text-xs font-mono">
+            <span class="text-slate-400">Loading chart...</span>
+          </div>
+          <button onclick="openAiModalForCurrentSymbol()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-xs font-semibold text-white shadow transition">
+            <span>🤖</span> <span>AI Insight</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Chart Display Areas -->
+      <div class="bg-terminal-950 border border-terminal-800 rounded-xl p-3 relative shadow-2xl">
+        <!-- Engine 1: Lightweight Charts -->
+        <div id="tv-chart-container" class="w-full h-[520px] rounded-lg overflow-hidden"></div>
+        
+        <!-- Engine 2: TradingView Official Widget (Hidden by default) -->
+        <div id="tradingview_widget_container" class="w-full h-[540px] rounded-lg overflow-hidden hidden">
+          <div id="tradingview_chart_element" class="w-full h-full"></div>
+        </div>
+
+        <div id="chart-sub-footer" class="flex items-center justify-between text-[11px] text-slate-500 mt-2 px-2">
+          <div class="flex items-center gap-3">
+            <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-yellow-400 inline-block"></span> MA 20</span>
+            <span class="flex items-center gap-1"><span class="w-3 h-0.5 bg-blue-400 inline-block"></span> MA 50</span>
+            <span class="text-slate-400 font-mono">Scroll mouse untuk zoom, drag untuk pan</span>
+          </div>
+          <span class="font-mono">Real-Time Data Engine</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 3: BANDAR HUNTER ==================== -->
+    <section id="tab-bandar" class="tab-content hidden space-y-4">
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="font-bold text-base text-white flex items-center gap-2">
+            <span>🦈</span> <span>Screener Akumulasi Smart Money & Bandar IDX</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Mendeteksi emiten dengan lonjakan Chaikin Money Flow (CMF), OBV Uptrend, dan konsentrasi volume institusi.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="text" id="bandar-search" oninput="filterBandarTable()" placeholder="Cari emiten..." 
+                 class="bg-terminal-950 border border-terminal-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500 w-40">
+          <button onclick="loadBandarData(true)" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-medium text-white transition">
+            Scan Sekarang
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl overflow-hidden shadow">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-terminal-950/80 text-slate-400 uppercase text-[11px] border-b border-terminal-800">
+              <tr>
+                <th class="py-3 px-4">EMITEN</th>
+                <th class="px-4">HARGA</th>
+                <th class="px-4">CHANGE (1H/5H)</th>
+                <th class="px-4">SKOR AKUMULASI</th>
+                <th class="px-4">STATUS</th>
+                <th class="px-4">CMF</th>
+                <th class="px-4">RVOL</th>
+                <th class="px-4">TURNOVER</th>
+                <th class="px-4 text-center">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="bandar-table-body" class="divide-y divide-terminal-800/60 font-mono">
+              <tr><td colspan="9" class="py-6 text-center text-slate-500">Memuat data screener bandar...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 4: VOLUME BREAKOUT ==================== -->
+    <section id="tab-breakout" class="tab-content hidden space-y-4">
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="font-bold text-base text-white flex items-center gap-2">
+            <span>🚀</span> <span>Radar Lonjakan Volume Breakout & Spikes</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Saham dengan volume perdagangan abnormal (&ge;2.0x lipat normal), kenaikan harga signifikan, dan likuiditas prima.</p>
+        </div>
+        <button onclick="loadBreakoutData(true)" class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-xs font-medium text-white transition">
+          Scan Breakout
+        </button>
+      </div>
+
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl overflow-hidden shadow">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-terminal-950/80 text-slate-400 uppercase text-[11px] border-b border-terminal-800">
+              <tr>
+                <th class="py-3 px-4">EMITEN</th>
+                <th class="px-4">HARGA</th>
+                <th class="px-4">CHANGE</th>
+                <th class="px-4">LONJAKAN VOLUME (RVOL)</th>
+                <th class="px-4">TURNOVER</th>
+                <th class="px-4">BREAK 20D HIGH</th>
+                <th class="px-4">MA20</th>
+                <th class="px-4 text-center">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="breakout-table-body" class="divide-y divide-terminal-800/60 font-mono">
+              <tr><td colspan="8" class="py-6 text-center text-slate-500">Memuat data volume breakout...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 5: SEKTOR HEATMAP ==================== -->
+    <section id="tab-sektor" class="tab-content hidden space-y-4">
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="font-bold text-base text-white flex items-center gap-2">
+            <span>🗺️</span> <span>Interactive Sektor Heatmap & Radar Rotasi IDX</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Visualisasi aliran dana (money flow) dan rotasi sektor di Bursa Efek Indonesia.</p>
+        </div>
+        <button onclick="loadSektorData(true)" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium text-white transition">
+          Update Sektor
+        </button>
+      </div>
+
+      <!-- Treemap / Cards Grid -->
+      <div id="sektor-heatmap-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="col-span-full py-12 text-center text-slate-500">Memuat heatmap sektor IDX...</div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 6: SWING & BOW ==================== -->
+    <section id="tab-swing" class="tab-content hidden space-y-4">
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="font-bold text-base text-white flex items-center gap-2">
+            <span>🎯</span> <span>Screener Buy on Weakness (BoW) & Rebound</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Saham likuid yang oversold/diskon di area support kuat dengan potensi Risk-to-Reward tinggi.</p>
+        </div>
+        <button onclick="loadSwingData(true)" class="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-medium text-white transition">
+          Scan BoW
+        </button>
+      </div>
+
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl overflow-hidden shadow">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-terminal-950/80 text-slate-400 uppercase text-[11px] border-b border-terminal-800">
+              <tr>
+                <th class="py-3 px-4">EMITEN</th>
+                <th class="px-4">HARGA</th>
+                <th class="px-4">RSI (14)</th>
+                <th class="px-4">BUY ZONE</th>
+                <th class="px-4">STOP LOSS</th>
+                <th class="px-4">TARGET TP</th>
+                <th class="px-4">RISK/REWARD</th>
+                <th class="px-4 text-center">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="swing-table-body" class="divide-y divide-terminal-800/60 font-mono">
+              <tr><td colspan="8" class="py-6 text-center text-slate-500">Memuat data swing & BoW...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 7: CRYPTO & FOREX ==================== -->
+    <section id="tab-crypto" class="tab-content hidden space-y-6">
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 class="font-bold text-base text-white flex items-center gap-2">
+            <span>🪙</span> <span>Cryptocurrency & Forex / Komoditas Dunia</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Pemantauan harga real-time pasar global (Bitcoin, Ethereum, Emas XAU, Minyak WTI, USD/IDR).</p>
+        </div>
+        <button onclick="loadCryptoForexData(true)" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-medium text-white transition">
+          Refresh Rates
+        </button>
+      </div>
+
+      <!-- Crypto Grid -->
+      <div class="space-y-3">
+        <h3 class="text-xs uppercase font-bold tracking-wider text-slate-400">🪙 Top Cryptocurrencies</h3>
+        <div id="crypto-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="col-span-full py-6 text-center text-slate-500">Memuat data crypto...</div>
+        </div>
+      </div>
+
+      <!-- Forex & Commodities Grid -->
+      <div class="space-y-3">
+        <h3 class="text-xs uppercase font-bold tracking-wider text-slate-400">🌍 Forex & Global Commodities</h3>
+        <div id="forex-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="col-span-full py-6 text-center text-slate-500">Memuat data forex & komoditas...</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 8: PAPER TRADING PORTFOLIO ==================== -->
+    <section id="tab-portfolio" class="tab-content hidden space-y-6">
+      <!-- Portfolio Metric Summary -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4">
+          <span class="text-xs text-slate-400">Total Nilai Portofolio (Equity)</span>
+          <div id="port-equity" class="text-2xl font-bold font-mono text-white mt-1">Rp --</div>
+          <div id="port-overall-pnl" class="text-xs font-mono text-emerald-400 mt-1">+Rp 0 (0.00%)</div>
+        </div>
+
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4">
+          <span class="text-xs text-slate-400">Saldo Kas Tunai</span>
+          <div id="port-cash" class="text-xl font-bold font-mono text-slate-200 mt-1">Rp --</div>
+          <span class="text-[11px] text-slate-500">Siap untuk eksekusi beli</span>
+        </div>
+
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4">
+          <span class="text-xs text-slate-400">Nilai Aset Saham Terbuka</span>
+          <div id="port-stock-val" class="text-xl font-bold font-mono text-sky-400 mt-1">Rp --</div>
+          <div id="port-pos-count" class="text-[11px] text-slate-400">0 Posisi Saham</div>
+        </div>
+
+        <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4">
+          <span class="text-xs text-slate-400">Performa Win Rate</span>
+          <div id="port-winrate" class="text-xl font-bold font-mono text-emerald-400 mt-1">0.0%</div>
+          <div id="port-trades-count" class="text-[11px] text-slate-500">0 Transaksi Selesai</div>
+        </div>
+      </div>
+
+      <!-- Quick Trade Execution Bar -->
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-xs font-bold text-slate-300">⚡ Simulasi Order Paper Trade:</span>
+          <input type="text" id="order-symbol" placeholder="Emiten (cth: BBRI)" class="bg-terminal-950 border border-terminal-700 rounded-lg px-3 py-1.5 text-xs font-mono uppercase text-white focus:outline-none focus:border-sky-500 w-32">
+          <input type="number" id="order-lots" placeholder="Lot (cth: 5)" min="1" class="bg-terminal-950 border border-terminal-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-sky-500 w-24">
+          <button onclick="executePaperTrade('BUY')" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white transition">
+            BELI (BUY)
+          </button>
+          <button onclick="executePaperTrade('SELL')" class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white transition">
+            JUAL (SELL)
+          </button>
+        </div>
+        <button onclick="confirmResetPortfolio()" class="px-3 py-1.5 rounded-lg bg-terminal-800 hover:bg-rose-950/60 text-xs font-medium text-rose-400 border border-terminal-700 hover:border-rose-800 transition">
+          Reset Portofolio
+        </button>
+      </div>
+
+      <!-- Open Positions Table -->
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl overflow-hidden shadow space-y-3 p-4">
+        <h3 class="font-bold text-sm text-slate-200">📌 Posisi Saham Aktif</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-terminal-950/80 text-slate-400 uppercase text-[11px] border-b border-terminal-800">
+              <tr>
+                <th class="py-2.5 px-3">EMITEN</th>
+                <th class="px-3">JUMLAH LOT</th>
+                <th class="px-3">AVG BELI</th>
+                <th class="px-3">HARGA KINI</th>
+                <th class="px-3">NILAI PASAR</th>
+                <th class="px-3">TARGET TP</th>
+                <th class="px-3">STOP LOSS</th>
+                <th class="px-3">FLOATING PNL</th>
+                <th class="px-3 text-center">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="portfolio-positions-body" class="divide-y divide-terminal-800/60 font-mono">
+              <tr><td colspan="9" class="py-6 text-center text-slate-500">Tidak ada posisi saham aktif.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Trade History Table -->
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl overflow-hidden shadow space-y-3 p-4">
+        <h3 class="font-bold text-sm text-slate-200">📜 Riwayat Transaksi Terakhir</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-terminal-950/80 text-slate-400 uppercase text-[11px] border-b border-terminal-800">
+              <tr>
+                <th class="py-2.5 px-3">WAKTU</th>
+                <th class="px-3">EMITEN</th>
+                <th class="px-3">LOT</th>
+                <th class="px-3">HARGA BELI</th>
+                <th class="px-3">HARGA JUAL</th>
+                <th class="px-3">NET PNL</th>
+                <th class="px-3">RETURN</th>
+                <th class="px-3">ALASAN KELUAR</th>
+              </tr>
+            </thead>
+            <tbody id="portfolio-history-body" class="divide-y divide-terminal-800/60 font-mono">
+              <tr><td colspan="8" class="py-4 text-center text-slate-500">Belum ada riwayat transaksi.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== TAB 9: PRICE ALERTS ==================== -->
+    <section id="tab-alerts" class="tab-content hidden space-y-4">
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h2 class="font-bold text-base text-white flex items-center gap-2">
+            <span>🔔</span> <span>Control Panel & Pengaturan Alarm Harga</span>
+          </h2>
+          <p class="text-xs text-slate-400 mt-0.5">Pasang alarm harga tanpa harus mengetik command di Telegram. Notifikasi otomatis saat target tercapai.</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <input type="text" id="alert-symbol" placeholder="Emiten (cth: ANTM)" class="bg-terminal-950 border border-terminal-700 rounded-lg px-3 py-1.5 text-xs font-mono uppercase text-white focus:outline-none focus:border-sky-500 w-32">
+          <input type="number" id="alert-target" placeholder="Target Harga (cth: 1800)" class="bg-terminal-950 border border-terminal-700 rounded-lg px-3 py-1.5 text-xs font-mono text-white focus:outline-none focus:border-sky-500 w-36">
+          <button onclick="createNewAlert()" class="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-xs font-semibold text-white transition">
+            + Tambah Alert
+          </button>
+        </div>
+      </div>
+
+      <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl overflow-hidden shadow">
+        <div class="overflow-x-auto">
+          <table class="w-full text-xs text-left">
+            <thead class="bg-terminal-950/80 text-slate-400 uppercase text-[11px] border-b border-terminal-800">
+              <tr>
+                <th class="py-3 px-4">ID</th>
+                <th class="px-4">EMITEN</th>
+                <th class="px-4">HARGA SAAT DIBUAT</th>
+                <th class="px-4">TARGET ALARM</th>
+                <th class="px-4">KONDISI</th>
+                <th class="px-4">STATUS</th>
+                <th class="px-4">WAKTU DIBUAT</th>
+                <th class="px-4 text-center">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="alerts-table-body" class="divide-y divide-terminal-800/60 font-mono">
+              <tr><td colspan="8" class="py-6 text-center text-slate-500">Memuat daftar alarm...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ==================== MODAL: AI MARKET INSIGHT & TRADING PLAN ==================== -->
+  <div id="ai-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-terminal-900 border border-terminal-700 rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto custom-scrollbar">
+      <div class="flex items-center justify-between border-b border-terminal-800 pb-3">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl">🤖</span>
+          <div>
+            <h3 id="ai-modal-title" class="font-bold text-white text-base">Analisis AI & Trading Plan</h3>
+            <p id="ai-modal-subtitle" class="text-xs text-slate-400">Powered by Gemini AI & Quantitative Consensus</p>
+          </div>
+        </div>
+        <button onclick="closeAiModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-terminal-800">
+          ✕
+        </button>
+      </div>
+
+      <div id="ai-modal-loading" class="py-12 text-center text-slate-400 space-y-2">
+        <div class="inline-block w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-xs font-mono">Sedang mengekstrak indikator teknikal & sintesis AI...</p>
+      </div>
+
+      <div id="ai-modal-content" class="hidden space-y-4">
+        <!-- Trading Plan Card -->
+        <div class="bg-terminal-950 p-4 rounded-xl border border-terminal-800 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs font-mono">
+          <div>
+            <span class="text-slate-500 text-[10px] block">SIGNAL</span>
+            <span id="plan-signal" class="font-bold text-emerald-400 text-sm">BUY</span>
+          </div>
+          <div>
+            <span class="text-slate-500 text-[10px] block">BUY ZONE</span>
+            <span id="plan-buy-zone" class="text-slate-200">--</span>
+          </div>
+          <div>
+            <span class="text-slate-500 text-[10px] block">TARGET TP</span>
+            <span id="plan-tp" class="text-emerald-400 font-bold">--</span>
+          </div>
+          <div>
+            <span class="text-slate-500 text-[10px] block">STOP LOSS</span>
+            <span id="plan-sl" class="text-rose-400 font-bold">--</span>
+          </div>
+        </div>
+
+        <!-- AI Insight Text Area -->
+        <div class="bg-terminal-950 p-4 rounded-xl border border-terminal-800 text-xs leading-relaxed space-y-2">
+          <h4 class="font-bold text-sky-400 flex items-center gap-1.5">
+            <span>💡</span> <span>Sintesis AI & Diagnosis Pasar</span>
+          </h4>
+          <div id="ai-insight-text" class="text-slate-300 whitespace-pre-line font-sans text-xs"></div>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-2">
+        <button onclick="closeAiModal()" class="px-4 py-2 rounded-lg bg-terminal-800 hover:bg-terminal-700 text-xs font-medium text-slate-200">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    const API_BASE = (window.location.protocol === 'file:') ? 'http://127.0.0.1:8000' : '';
+    function apiFetch(url, opts) {
+      const full = url.startsWith('http') ? url : (API_BASE + url);
+      return fetch(full, opts);
+    }
+    let currentTab = 'overview';
+    let currentChartSymbol = 'BBCA';
+    let currentChartEngine = 'lightweight'; // 'lightweight' or 'tradingview'
+    let tvChart = null;
+    let candleSeries = null;
+    let volumeSeries = null;
+    let ma20Line = null;
+    let ma50Line = null;
+    let cachedBandar = [];
+
+    function formatIDR(val) {
+      if (val === null || val === undefined) return 'Rp 0';
+      return 'Rp ' + Number(val).toLocaleString('id-ID');
+    }
+
+    function formatTurnover(val) {
+      if (!val) return 'Rp 0';
+      if (val >= 1e12) return 'Rp ' + (val / 1e12).toFixed(2) + ' T';
+      if (val >= 1e9) return 'Rp ' + (val / 1e9).toFixed(1) + ' M';
+      return formatIDR(val);
+    }
+
+    function updateClock() {
+      const now = new Date();
+      const str = now.toLocaleTimeString('id-ID', { hour12: false }) + ' WIB';
+      const el = document.getElementById('live-clock');
+      if (el) el.innerText = str;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function switchTab(tabId) {
+      currentTab = tabId;
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('border-sky-500', 'text-sky-400');
+        btn.classList.add('border-transparent', 'text-slate-400');
+      });
+
+      const activeContent = document.getElementById('tab-' + tabId);
+      if (activeContent) activeContent.classList.remove('hidden');
+
+      const activeBtn = document.getElementById('tab-btn-' + tabId);
+      if (activeBtn) {
+        activeBtn.classList.remove('border-transparent', 'text-slate-400');
+        activeBtn.classList.add('border-sky-500', 'text-sky-400');
+      }
+
+      try {
+        if (tabId === 'overview') loadOverviewData();
+        else if (tabId === 'chart') {
+          setTimeout(() => {
+            if (currentChartEngine === 'lightweight') {
+              if (!tvChart) initLightweightChart();
+              loadChartForSymbol(currentChartSymbol);
+            } else {
+              renderTradingViewWidget(currentChartSymbol);
+            }
+          }, 80);
+        }
+        else if (tabId === 'bandar') loadBandarData();
+        else if (tabId === 'breakout') loadBreakoutData();
+        else if (tabId === 'sektor') loadSektorData();
+        else if (tabId === 'swing') loadSwingData();
+        else if (tabId === 'crypto') loadCryptoForexData();
+        else if (tabId === 'portfolio') loadPortfolioData();
+        else if (tabId === 'alerts') loadAlertsData();
+      } catch (err) {
+        console.error('Error switching tab:', err);
+      }
+    }
+
+    function refreshCurrentTab(force = true) {
+      if (currentTab === 'overview') loadOverviewData();
+      else if (currentTab === 'chart') loadChartForSymbol(currentChartSymbol);
+      else if (currentTab === 'bandar') loadBandarData(force);
+      else if (currentTab === 'breakout') loadBreakoutData(force);
+      else if (currentTab === 'sektor') loadSektorData(force);
+      else if (currentTab === 'swing') loadSwingData(force);
+      else if (currentTab === 'crypto') loadCryptoForexData(force);
+      else if (currentTab === 'portfolio') loadPortfolioData();
+      else if (currentTab === 'alerts') loadAlertsData();
+    }
+
+    // 1. OVERVIEW DATA
+    async function loadOverviewData() {
+      try {
+        const res = await apiFetch('/api/overview');
+        const data = await res.json();
+        if (data.error) return;
+
+        document.getElementById('stat-equity').innerText = formatIDR(data.equity);
+        const pnlSign = data.pnl >= 0 ? '+' : '';
+        const pnlColor = data.pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        document.getElementById('stat-pnl').className = `text-xs font-mono ${pnlColor} mt-1 flex items-center gap-1`;
+        document.getElementById('stat-pnl').innerText = `${pnlSign}${formatIDR(data.pnl)} (${pnlSign}${data.pnl_pct}%)`;
+
+        if (data.leader_sector) {
+          document.getElementById('stat-leader-sektor').innerText = data.leader_sector.name;
+          const chg = data.leader_sector.avg_change;
+          document.getElementById('stat-leader-chg').innerText = `${chg >= 0 ? '+' : ''}${chg}% avg gain`;
+        }
+
+        if (data.bandar_top && data.bandar_top.length > 0) {
+          const topB = data.bandar_top[0];
+          document.getElementById('stat-bandar-top').innerText = `${topB.symbol} (${formatIDR(topB.close)})`;
+          document.getElementById('stat-bandar-score').innerText = `Skor: ${topB.score}/100 • RVol ${topB.rvol.toFixed(1)}x`;
+
+          const tbody = document.getElementById('overview-bandar-list');
+          tbody.innerHTML = data.bandar_top.map(b => `
+            <tr>
+              <td class="py-2.5 font-bold text-white flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span> ${b.symbol}
+              </td>
+              <td>${formatIDR(b.close)}</td>
+              <td class="${b.change_1d >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${b.change_1d >= 0 ? '+' : ''}${b.change_1d}%</td>
+              <td><span class="px-2 py-0.5 rounded text-[10px] bg-emerald-500/20 text-emerald-400 font-bold">${b.score}/100</span></td>
+              <td>
+                <button onclick="viewStockChart('${b.symbol}')" class="px-2 py-1 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-[10px]">Chart</button>
+              </td>
+            </tr>
+          `).join('');
+        }
+
+        if (data.breakout_top && data.breakout_top.length > 0) {
+          const topBrk = data.breakout_top[0];
+          document.getElementById('stat-breakout-top').innerText = `${topBrk.symbol} (+${topBrk.change_pct}%)`;
+          document.getElementById('stat-breakout-rvol').innerText = `RVol: ${topBrk.rvol}x Lipat Normal`;
+
+          const tbody = document.getElementById('overview-breakout-list');
+          tbody.innerHTML = data.breakout_top.map(brk => `
+            <tr>
+              <td class="py-2.5 font-bold text-white flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span> ${brk.symbol}
+              </td>
+              <td>${formatIDR(brk.close)}</td>
+              <td class="text-emerald-400">+${brk.change_pct}%</td>
+              <td><span class="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-400 font-bold">${brk.rvol}x</span></td>
+              <td>
+                <button onclick="viewStockChart('${brk.symbol}')" class="px-2 py-1 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-[10px]">Chart</button>
+              </td>
+            </tr>
+          `).join('');
+        }
+
+        if (data.crypto_top && data.crypto_top.length > 0) {
+          const strip = document.getElementById('crypto-strip');
+          strip.innerHTML = data.crypto_top.map(c => `
+            <div class="flex items-center gap-1.5">
+              <span class="text-slate-300 font-semibold">${c.symbol}:</span>
+              <span>${c.formatted_price}</span>
+              <span class="${c.change_pct >= 0 ? 'text-emerald-400' : 'text-rose-400'}">(${c.change_pct >= 0 ? '+' : ''}${c.change_pct}%)</span>
+            </div>
+          `).join('<span class="text-slate-700">|</span>');
+        }
+      } catch (e) {
+        console.error('Error loading overview:', e);
+      }
+    }
+
+    // 2. CHART ENGINE & SWITCHER
+    function switchChartEngine(engine) {
+      currentChartEngine = engine;
+      const lwContainer = document.getElementById('tv-chart-container');
+      const tvContainer = document.getElementById('tradingview_widget_container');
+      const subFooter = document.getElementById('chart-sub-footer');
+
+      const btnLw = document.getElementById('btn-chart-mode-lw');
+      const btnTv = document.getElementById('btn-chart-mode-tv');
+
+      if (engine === 'lightweight') {
+        lwContainer.classList.remove('hidden');
+        tvContainer.classList.add('hidden');
+        subFooter.classList.remove('hidden');
+
+        btnLw.className = "px-2.5 py-1 rounded font-medium bg-sky-600 text-white transition";
+        btnTv.className = "px-2.5 py-1 rounded font-medium text-slate-400 hover:text-white transition";
+
+        if (!tvChart) initLightweightChart();
+        loadChartForSymbol(currentChartSymbol);
+      } else {
+        lwContainer.classList.add('hidden');
+        tvContainer.classList.remove('hidden');
+        subFooter.classList.add('hidden');
+
+        btnTv.className = "px-2.5 py-1 rounded font-medium bg-sky-600 text-white transition";
+        btnLw.className = "px-2.5 py-1 rounded font-medium text-slate-400 hover:text-white transition";
+
+        renderTradingViewWidget(currentChartSymbol);
+      }
+    }
+
+    function initLightweightChart() {
+      const container = document.getElementById('tv-chart-container');
+      if (!container) return;
+
+      container.innerHTML = '';
+      try {
+        tvChart = LightweightCharts.createChart(container, {
+          width: container.clientWidth || 800,
+          height: 520,
+          layout: {
+            background: { color: '#070b13' },
+            textColor: '#94a3b8',
+            fontSize: 11,
+            fontFamily: 'JetBrains Mono',
+          },
+          grid: {
+            vertLines: { color: 'rgba(30, 41, 59, 0.4)' },
+            horzLines: { color: 'rgba(30, 41, 59, 0.4)' },
+          },
+          crosshair: {
+            mode: LightweightCharts.CrosshairMode.Normal,
+          },
+          rightPriceScale: {
+            borderColor: '#1e293b',
+          },
+          timeScale: {
+            borderColor: '#1e293b',
+            timeVisible: true,
+            secondsVisible: false,
+          },
+        });
+
+        // Safe setup for v4 / v5
+        const volOpts = {
+          color: '#26a69a',
+          priceFormat: { type: 'volume' },
+          priceScaleId: '',
+          scaleMargins: { top: 0.8, bottom: 0 },
+        };
+        const candleOpts = {
+          upColor: '#10b981',
+          downColor: '#ef4444',
+          borderVisible: false,
+          wickUpColor: '#10b981',
+          wickDownColor: '#ef4444',
+        };
+        const ma20Opts = { color: '#facc15', lineWidth: 1.5, title: 'MA20' };
+        const ma50Opts = { color: '#38bdf8', lineWidth: 1.5, title: 'MA50' };
+
+        if (typeof tvChart.addHistogramSeries === 'function') {
+          volumeSeries = tvChart.addHistogramSeries(volOpts);
+          candleSeries = tvChart.addCandlestickSeries(candleOpts);
+          ma20Line = tvChart.addLineSeries(ma20Opts);
+          ma50Line = tvChart.addLineSeries(ma50Opts);
+        } else if (typeof tvChart.addSeries === 'function') {
+          volumeSeries = tvChart.addSeries(LightweightCharts.HistogramSeries, volOpts);
+          candleSeries = tvChart.addSeries(LightweightCharts.CandlestickSeries, candleOpts);
+          ma20Line = tvChart.addSeries(LightweightCharts.LineSeries, ma20Opts);
+          ma50Line = tvChart.addSeries(LightweightCharts.LineSeries, ma50Opts);
+        }
+
+        window.addEventListener('resize', () => {
+          if (tvChart && container) {
+            tvChart.applyOptions({ width: container.clientWidth });
+          }
+        });
+      } catch (err) {
+        console.error('Error creating chart:', err);
+        container.innerHTML = `<div class="p-4 text-rose-400">Error rendering chart: ${err.message}</div>`;
+      }
+    }
+
+    async function loadChartForSymbol(sym) {
+      if (!sym) {
+        sym = document.getElementById('chart-symbol-input').value.trim() || 'BBCA';
+      }
+      currentChartSymbol = sym.toUpperCase();
+      document.getElementById('chart-symbol-input').value = currentChartSymbol;
+
+      if (currentChartEngine === 'tradingview') {
+        renderTradingViewWidget(currentChartSymbol);
+        return;
+      }
+
+      const infoBar = document.getElementById('chart-info-bar');
+      infoBar.innerHTML = `<span class="text-sky-400 font-mono">Mengambil data OHLCV ${currentChartSymbol}...</span>`;
+
+      try {
+        const res = await apiFetch(`/api/chart/${currentChartSymbol}`);
+        if (!res.ok) throw new Error('Data saham tidak ditemukan');
+        const data = await res.json();
+
+        if (!tvChart) initLightweightChart();
+
+        if (candleSeries && data.candles && data.candles.length > 0) {
+          candleSeries.setData(data.candles);
+          if (volumeSeries && data.volumes) volumeSeries.setData(data.volumes);
+          if (ma20Line && data.ma20) ma20Line.setData(data.ma20);
+          if (ma50Line && data.ma50) ma50Line.setData(data.ma50);
+          tvChart.timeScale().fitContent();
+        }
+
+        const chgSign = data.change_pt >= 0 ? '+' : '';
+        const chgColor = data.change_pt >= 0 ? 'text-emerald-400' : 'text-rose-400';
+
+        infoBar.innerHTML = `
+          <span class="font-bold text-white text-sm">${data.symbol}</span>
+          <span class="text-slate-200">${formatIDR(data.current_price)}</span>
+          <span class="${chgColor} font-bold">${chgSign}${data.change_pct}%</span>
+          <span class="text-slate-500 hidden sm:inline">(${data.display_name})</span>
+        `;
+      } catch (e) {
+        infoBar.innerHTML = `<span class="text-rose-400 font-mono">${e.message}</span>`;
+      }
+    }
+
+    function renderTradingViewWidget(sym) {
+      let tvSymbol = 'IDX:' + sym;
+      if (sym === 'BTC' || sym === 'BTC-USD' || sym === 'BTCUSDT') tvSymbol = 'BINANCE:BTCUSDT';
+      else if (sym === 'ETH' || sym === 'ETH-USD' || sym === 'ETHUSDT') tvSymbol = 'BINANCE:ETHUSDT';
+      else if (sym === 'SOL' || sym === 'SOL-USD') tvSymbol = 'BINANCE:SOLUSDT';
+      else if (sym === 'XAU' || sym === 'GOLD' || sym === 'GC=F') tvSymbol = 'OANDA:XAUUSD';
+      else if (sym === 'OIL' || sym === 'WTI' || sym === 'CL=F') tvSymbol = 'TVC:USOIL';
+      else if (sym.includes('USDIDR') || sym.includes('IDR=X')) tvSymbol = 'FX_IDC:USDIDR';
+      else if (sym.includes('EURUSD')) tvSymbol = 'FX:EURUSD';
+
+      const el = document.getElementById('tradingview_chart_element');
+      el.innerHTML = '';
+
+      if (window.TradingView) {
+        new TradingView.widget({
+          "autosize": true,
+          "symbol": tvSymbol,
+          "interval": "D",
+          "timezone": "Asia/Jakarta",
+          "theme": "dark",
+          "style": "1",
+          "locale": "id",
+          "toolbar_bg": "#0f172a",
+          "enable_publishing": false,
+          "hide_top_toolbar": false,
+          "save_image": false,
+          "container_id": "tradingview_chart_element",
+          "studies": [
+            "MASimple@tv-basicstudies",
+            "RSI@tv-basicstudies"
+          ]
+        });
+      } else {
+        el.innerHTML = '<div class="p-8 text-center text-slate-400">Loading TradingView engine...</div>';
+      }
+
+      const infoBar = document.getElementById('chart-info-bar');
+      infoBar.innerHTML = `<span class="font-bold text-sky-400">${tvSymbol}</span> <span class="text-slate-400">(TradingView Pro View)</span>`;
+    }
+
+    function quickSelectChart(sym) {
+      currentChartSymbol = sym;
+      document.getElementById('chart-symbol-input').value = sym;
+      loadChartForSymbol(sym);
+    }
+
+    function viewStockChart(sym) {
+      currentChartSymbol = sym;
+      document.getElementById('chart-symbol-input').value = sym;
+      switchTab('chart');
+    }
+
+    // 3. BANDAR SCREENER
+    async function loadBandarData(force = false) {
+      const tbody = document.getElementById('bandar-table-body');
+      tbody.innerHTML = '<tr><td colspan="9" class="py-6 text-center text-slate-400 font-mono">⏳ Scanning akumulasi smart money seluruh watchlist...</td></tr>';
+
+      try {
+        const res = await apiFetch(`/api/bandar?limit=25&force_refresh=${force}`);
+        const data = await res.json();
+        cachedBandar = data.accumulations || [];
+        renderBandarTable(cachedBandar);
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="9" class="py-6 text-center text-rose-400">Gagal memuat screener bandar: ' + e + '</td></tr>';
+      }
+    }
+
+    function renderBandarTable(list) {
+      const tbody = document.getElementById('bandar-table-body');
+      if (!list || list.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="py-6 text-center text-slate-500">Tidak ada emiten dengan akumulasi kuat saat ini.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = list.map(s => {
+        const scoreBadge = s.score >= 75 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-sky-500/20 text-sky-400 border border-sky-500/30';
+        const chg1dSign = s.change_1d >= 0 ? '+' : '';
+        const chg5dSign = s.change_5d >= 0 ? '+' : '';
+        const chgColor = s.change_1d >= 0 ? 'text-emerald-400' : 'text-rose-400';
+
+        return `
+          <tr class="hover:bg-terminal-850/50 transition">
+            <td class="py-3 px-4 font-bold text-white flex items-center gap-2">
+              <span>🦈</span> <span>${s.symbol}</span>
+            </td>
+            <td class="px-4 text-slate-200">${formatIDR(s.close)}</td>
+            <td class="px-4 ${chgColor}">${chg1dSign}${s.change_1d}% <span class="text-slate-500 text-[10px]">(${chg5dSign}${s.change_5d}%)</span></td>
+            <td class="px-4">
+              <span class="px-2.5 py-1 rounded text-xs font-bold ${scoreBadge}">${s.score}/100</span>
+            </td>
+            <td class="px-4 text-slate-300 font-sans text-xs">${s.status}</td>
+            <td class="px-4 ${s.cmf >= 0 ? 'text-emerald-400' : 'text-rose-400'}">${s.cmf >= 0 ? '+' : ''}${s.cmf.toFixed(3)}</td>
+            <td class="px-4 text-amber-400">${s.rvol.toFixed(1)}x</td>
+            <td class="px-4 text-slate-300">${formatTurnover(s.turnover)}</td>
+            <td class="px-4 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="viewStockChart('${s.symbol}')" class="px-2 py-1 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs">Chart</button>
+                <button onclick="openAiModal('${s.symbol}')" class="px-2 py-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-xs">AI</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterBandarTable() {
+      const q = document.getElementById('bandar-search').value.trim().toUpperCase();
+      if (!q) {
+        renderBandarTable(cachedBandar);
+        return;
+      }
+      const filtered = cachedBandar.filter(s => s.symbol.includes(q));
+      renderBandarTable(filtered);
+    }
+
+    // 4. BREAKOUT SCANNER
+    async function loadBreakoutData(force = false) {
+      const tbody = document.getElementById('breakout-table-body');
+      tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-slate-400 font-mono">⏳ Scanning lonjakan volume abnormal...</td></tr>';
+
+      try {
+        const res = await apiFetch(`/api/breakout?force_refresh=${force}`);
+        const data = await res.json();
+        const list = data.breakouts || [];
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-slate-500">Belum ada emiten dengan lonjakan volume (RVol &ge;2.0x) saat ini. Pasar sedang tenang.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(b => `
+          <tr class="hover:bg-terminal-850/50 transition">
+            <td class="py-3 px-4 font-bold text-white flex items-center gap-2">
+              <span>⚡</span> <span>${b.symbol}</span>
+            </td>
+            <td class="px-4 text-slate-200">${formatIDR(b.close)}</td>
+            <td class="px-4 text-emerald-400 font-bold">+${b.change_pct}%</td>
+            <td class="px-4">
+              <span class="px-2.5 py-1 rounded text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                ${b.rvol}x Lipat Normal
+              </span>
+            </td>
+            <td class="px-4 text-slate-300">${formatTurnover(b.turnover)}</td>
+            <td class="px-4">${b.is_break_high20 ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-slate-500">No</span>'}</td>
+            <td class="px-4 text-slate-400">${formatIDR(b.ma20)}</td>
+            <td class="px-4 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="viewStockChart('${b.symbol}')" class="px-2 py-1 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs">Chart</button>
+                <button onclick="openAiModal('${b.symbol}')" class="px-2 py-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-xs">AI</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-rose-400">Gagal memuat breakout: ' + e + '</td></tr>';
+      }
+    }
+
+    // 5. SEKTOR HEATMAP
+    async function loadSektorData(force = false) {
+      const grid = document.getElementById('sektor-heatmap-grid');
+      grid.innerHTML = '<div class="col-span-full py-12 text-center text-slate-400 font-mono">⏳ Menganalisis rotasi 8 sektor BEI...</div>';
+
+      try {
+        const res = await apiFetch(`/api/sektor?force_refresh=${force}`);
+        const data = await res.json();
+        const sectors = data.sectors || [];
+
+        if (sectors.length === 0) {
+          grid.innerHTML = '<div class="col-span-full py-12 text-center text-slate-500">Data sektor tidak tersedia.</div>';
+          return;
+        }
+
+        grid.innerHTML = sectors.map(sec => {
+          const avg = sec.avg_change;
+          let bgColor = 'bg-terminal-900/80 border-terminal-800';
+          let badgeColor = 'bg-slate-700/40 text-slate-300';
+
+          if (avg >= 1.0) {
+            bgColor = 'bg-emerald-950/40 border-emerald-800/60 glow-green';
+            badgeColor = 'bg-emerald-500/20 text-emerald-400';
+          } else if (avg > 0) {
+            bgColor = 'bg-emerald-950/20 border-emerald-900/50';
+            badgeColor = 'bg-emerald-500/10 text-emerald-400';
+          } else if (avg <= -1.0) {
+            bgColor = 'bg-rose-950/40 border-rose-800/60';
+            badgeColor = 'bg-rose-500/20 text-rose-400';
+          } else if (avg < 0) {
+            bgColor = 'bg-rose-950/20 border-rose-900/50';
+            badgeColor = 'bg-rose-500/10 text-rose-400';
+          }
+
+          const sign = avg >= 0 ? '+' : '';
+
+          return `
+            <div class="${bgColor} border rounded-xl p-4 flex flex-col justify-between space-y-3 transition hover:scale-[1.01]">
+              <div class="flex items-start justify-between gap-2">
+                <span class="font-bold text-sm text-white">${sec.name}</span>
+                <span class="px-2 py-0.5 rounded text-xs font-mono font-bold ${badgeColor}">${sign}${avg}%</span>
+              </div>
+              <div class="space-y-1.5 text-xs">
+                <div class="flex justify-between text-slate-400">
+                  <span>Turnover:</span>
+                  <span class="font-mono text-slate-200">${formatTurnover(sec.total_turnover)}</span>
+                </div>
+                <div class="flex justify-between text-slate-400">
+                  <span>Rasio Saham:</span>
+                  <span class="font-mono text-emerald-400 font-semibold">${sec.green_count} 🟢</span>
+                  <span class="font-mono text-rose-400 font-semibold">${sec.red_count} 🔴</span>
+                  <span class="font-mono text-slate-400">${sec.flat_count} ⚪</span>
+                </div>
+                ${sec.top_gainer ? `
+                  <div class="flex justify-between text-[11px] pt-1 border-t border-terminal-800/60">
+                    <span class="text-slate-500">Leader:</span>
+                    <span class="font-mono text-emerald-400 font-bold">${sec.top_gainer.symbol} (+${sec.top_gainer.change_pct}%)</span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        grid.innerHTML = '<div class="col-span-full py-12 text-center text-rose-400">Gagal memuat sektor: ' + e + '</div>';
+      }
+    }
+
+    // 6. SWING & BOW
+    async function loadSwingData(force = false) {
+      const tbody = document.getElementById('swing-table-body');
+      tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-slate-400 font-mono">⏳ Scanning emiten oversold & support rebound...</td></tr>';
+
+      try {
+        const res = await apiFetch(`/api/swing?limit=15&force_refresh=${force}`);
+        const data = await res.json();
+        const list = data.swings || [];
+
+        if (list.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-slate-500">Tidak ada emiten di area support BoW saat ini.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = list.map(s => `
+          <tr class="hover:bg-terminal-850/50 transition">
+            <td class="py-3 px-4 font-bold text-white flex items-center gap-2">
+              <span>🎯</span> <span>${s.symbol}</span>
+            </td>
+            <td class="px-4 text-slate-200">${formatIDR(s.close)}</td>
+            <td class="px-4 text-amber-400 font-bold">${s.rsi}</td>
+            <td class="px-4 text-emerald-400">${formatIDR(s.buy_zone_min)} - ${formatIDR(s.buy_zone_max)}</td>
+            <td class="px-4 text-rose-400">${formatIDR(s.stop_loss)}</td>
+            <td class="px-4 text-sky-400 font-bold">${formatIDR(s.target_tp)}</td>
+            <td class="px-4 font-bold text-slate-300">1 : ${s.risk_reward_ratio}</td>
+            <td class="px-4 text-center">
+              <div class="flex items-center justify-center gap-1.5">
+                <button onclick="viewStockChart('${s.symbol}')" class="px-2 py-1 rounded bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 text-xs">Chart</button>
+                <button onclick="openAiModal('${s.symbol}')" class="px-2 py-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-400 text-xs">AI</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-rose-400">Gagal memuat swing: ' + e + '</td></tr>';
+      }
+    }
+
+    // 7. CRYPTO & FOREX
+    async function loadCryptoForexData(force = false) {
+      try {
+        const res = await apiFetch(`/api/crypto_forex?force_refresh=${force}`);
+        const data = await res.json();
+
+        const cGrid = document.getElementById('crypto-grid');
+        if (data.crypto && data.crypto.length > 0) {
+          cGrid.innerHTML = data.crypto.map(c => {
+            const isUp = c.change_pct >= 0;
+            return `
+              <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-col justify-between space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-white text-base">${c.symbol}/USD</span>
+                  <span class="px-2 py-0.5 rounded text-xs font-mono font-bold ${isUp ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+                    ${isUp ? '+' : ''}${c.change_pct}%
+                  </span>
+                </div>
+                <div class="font-mono text-xl font-bold text-slate-100">${c.formatted_price}</div>
+                <div class="flex justify-between items-center text-xs text-slate-400 pt-2 border-t border-terminal-800/60">
+                  <span>${c.name}</span>
+                  <button onclick="viewStockChart('${c.symbol}')" class="text-sky-400 hover:text-sky-300">Chart →</button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+
+        const fGrid = document.getElementById('forex-grid');
+        if (data.forex && data.forex.length > 0) {
+          fGrid.innerHTML = data.forex.map(f => {
+            const isUp = f.change_pct >= 0;
+            return `
+              <div class="bg-terminal-900/80 border border-terminal-800 rounded-xl p-4 flex flex-col justify-between space-y-2">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-white text-base">${f.name}</span>
+                  <span class="px-2 py-0.5 rounded text-xs font-mono font-bold ${isUp ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}">
+                    ${isUp ? '+' : ''}${f.change_pct}%
+                  </span>
+                </div>
+                <div class="font-mono text-xl font-bold text-slate-100">${f.formatted_price}</div>
+                <div class="flex justify-between items-center text-xs text-slate-400 pt-2 border-t border-terminal-800/60">
+                  <span class="font-mono text-[11px]">${f.ticker}</span>
+                  <button onclick="viewStockChart('${f.ticker}')" class="text-sky-400 hover:text-sky-300">Chart →</button>
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (e) {
+        console.error('Error loading crypto/forex:', e);
+      }
+    }
+
+    // 8. PAPER TRADING
+    async function loadPortfolioData() {
+      try {
+        const res = await apiFetch('/api/portfolio');
+        const data = await res.json();
+
+        document.getElementById('port-equity').innerText = formatIDR(data.total_equity);
+        document.getElementById('port-cash').innerText = formatIDR(data.cash_balance);
+        document.getElementById('port-stock-val').innerText = formatIDR(data.stock_value);
+        document.getElementById('port-winrate').innerText = `${data.win_rate}%`;
+        document.getElementById('port-pos-count').innerText = `${data.positions ? data.positions.length : 0} Posisi Saham`;
+        document.getElementById('port-trades-count').innerText = `${data.total_trades} Transaksi Selesai`;
+
+        const sign = data.overall_pnl >= 0 ? '+' : '';
+        const color = data.overall_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+        document.getElementById('port-overall-pnl').className = `text-xs font-mono ${color} mt-1`;
+        document.getElementById('port-overall-pnl').innerText = `${sign}${formatIDR(data.overall_pnl)} (${sign}${data.overall_pnl_pct}%)`;
+
+        const pBody = document.getElementById('portfolio-positions-body');
+        if (data.positions && data.positions.length > 0) {
+          pBody.innerHTML = data.positions.map(p => {
+            const pnlColor = p.unrealized_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+            const pnlSign = p.unrealized_pnl >= 0 ? '+' : '';
+            return `
+              <tr class="hover:bg-terminal-850/50 transition">
+                <td class="py-2.5 px-3 font-bold text-white">${p.symbol}</td>
+                <td class="px-3 text-slate-200">${p.lots} Lot</td>
+                <td class="px-3 text-slate-300">${formatIDR(p.avg_price)}</td>
+                <td class="px-3 text-slate-100 font-bold">${formatIDR(p.current_price)}</td>
+                <td class="px-3 text-slate-300">${formatIDR(p.market_value)}</td>
+                <td class="px-3 text-emerald-400">${formatIDR(p.tp_price)}</td>
+                <td class="px-3 text-rose-400">${formatIDR(p.sl_price)}</td>
+                <td class="px-3 ${pnlColor} font-bold">${pnlSign}${formatIDR(p.unrealized_pnl)} (${pnlSign}${p.pnl_pct}%)</td>
+                <td class="px-3 text-center">
+                  <button onclick="quickSellPosition('${p.symbol}', ${p.lots})" class="px-2.5 py-1 rounded bg-rose-600 hover:bg-rose-500 text-white text-[11px] font-bold">
+                    Jual Cepat
+                  </button>
+                </td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          pBody.innerHTML = '<tr><td colspan="9" class="py-6 text-center text-slate-500">Tidak ada posisi saham aktif (Portofolio 100% Kas Tunai).</td></tr>';
+        }
+
+        const hBody = document.getElementById('portfolio-history-body');
+        if (data.trade_history && data.trade_history.length > 0) {
+          hBody.innerHTML = data.trade_history.slice().reverse().map(h => {
+            const pnlColor = h.net_pnl >= 0 ? 'text-emerald-400' : 'text-rose-400';
+            const pnlSign = h.net_pnl >= 0 ? '+' : '';
+            return `
+              <tr class="hover:bg-terminal-850/50 transition text-xs">
+                <td class="py-2 px-3 text-slate-400">${h.date}</td>
+                <td class="px-3 font-bold text-white">${h.symbol}</td>
+                <td class="px-3">${h.lots} Lot</td>
+                <td class="px-3 text-slate-300">${formatIDR(h.buy_price)}</td>
+                <td class="px-3 text-slate-300">${formatIDR(h.sell_price)}</td>
+                <td class="px-3 ${pnlColor} font-bold">${pnlSign}${formatIDR(h.net_pnl)}</td>
+                <td class="px-3 ${pnlColor} font-bold">${pnlSign}${h.pnl_pct}%</td>
+                <td class="px-3 text-slate-400 font-sans">${h.reason}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          hBody.innerHTML = '<tr><td colspan="8" class="py-4 text-center text-slate-500">Belum ada riwayat transaksi.</td></tr>';
+        }
+      } catch (e) {
+        console.error('Error loading portfolio:', e);
+      }
+    }
+
+    async function executePaperTrade(action) {
+      const sym = document.getElementById('order-symbol').value.trim().toUpperCase();
+      const lots = parseInt(document.getElementById('order-lots').value);
+
+      if (!sym || !lots || lots <= 0) {
+        alert('Harap masukkan kode emiten dan jumlah lot yang valid.');
+        return;
+      }
+
+      const endpoint = action === 'BUY' ? '/api/paper/buy' : '/api/paper/sell';
+      try {
+        const res = await apiFetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: sym, lots: lots })
+        });
+        const result = await res.json();
+        alert(result.message || 'Order diproses.');
+        loadPortfolioData();
+        loadOverviewData();
+      } catch (e) {
+        alert('Gagal mengeksekusi order: ' + e);
+      }
+    }
+
+    async function quickSellPosition(sym, lots) {
+      if (!confirm(`Konfirmasi jual seluruh posisi ${sym} (${lots} lot)?`)) return;
+      try {
+        const res = await apiFetch('/api/paper/sell', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: sym, lots: lots, reason: "Manual Web Quick Sell" })
+        });
+        const result = await res.json();
+        alert(result.message || 'Posisi berhasil ditutup.');
+        loadPortfolioData();
+        loadOverviewData();
+      } catch (e) {
+        alert('Gagal menutup posisi: ' + e);
+      }
+    }
+
+    async function confirmResetPortfolio() {
+      if (!confirm('Yakin ingin mereset portofolio kembali ke modal awal Rp 100 Juta?')) return;
+      try {
+        const res = await apiFetch('/api/paper/reset', { method: 'POST' });
+        const result = await res.json();
+        alert(result.message);
+        loadPortfolioData();
+        loadOverviewData();
+      } catch (e) {
+        alert('Gagal mereset: ' + e);
+      }
+    }
+
+    // 9. ALERTS
+    async function loadAlertsData() {
+      const tbody = document.getElementById('alerts-table-body');
+      tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-slate-400 font-mono">⏳ Memuat daftar alarm harga...</td></tr>';
+
+      try {
+        const res = await apiFetch('/api/alerts');
+        const data = await res.json();
+        const alerts = data.alerts || [];
+
+        if (alerts.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-slate-500">Belum ada alarm harga yang aktif.</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = alerts.map(a => `
+          <tr class="hover:bg-terminal-850/50 transition">
+            <td class="py-3 px-4 text-slate-500">#${a.id}</td>
+            <td class="px-4 font-bold text-white">${a.symbol}</td>
+            <td class="px-4 text-slate-300">${formatIDR(a.created_price)}</td>
+            <td class="px-4 text-sky-400 font-bold">${formatIDR(a.target_price)}</td>
+            <td class="px-4 text-slate-300">${a.condition === 'GTE' ? '≥ (Naik menyentuh)' : '≤ (Turun menyentuh)'}</td>
+            <td class="px-4">${a.triggered ? '<span class="text-rose-400">Triggered</span>' : '<span class="text-emerald-400">Active 🟢</span>'}</td>
+            <td class="px-4 text-slate-400">${a.created_at}</td>
+            <td class="px-4 text-center">
+              <button onclick="deleteAlert(${a.id})" class="px-2 py-1 rounded bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 text-xs">
+                Hapus
+              </button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        tbody.innerHTML = '<tr><td colspan="8" class="py-6 text-center text-rose-400">Gagal memuat alarm: ' + e + '</td></tr>';
+      }
+    }
+
+    async function createNewAlert() {
+      const sym = document.getElementById('alert-symbol').value.trim().toUpperCase();
+      const target = parseFloat(document.getElementById('alert-target').value);
+
+      if (!sym || !target || target <= 0) {
+        alert('Harap masukkan kode emiten dan target harga yang valid.');
+        return;
+      }
+
+      try {
+        const res = await apiFetch('/api/alerts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: sym, target_price: target })
+        });
+        const result = await res.json();
+        alert(result.message || 'Alert berhasil dibuat.');
+        document.getElementById('alert-symbol').value = '';
+        document.getElementById('alert-target').value = '';
+        loadAlertsData();
+      } catch (e) {
+        alert('Gagal membuat alert: ' + e);
+      }
+    }
+
+    async function deleteAlert(id) {
+      if (!confirm(`Hapus alarm #${id}?`)) return;
+      try {
+        const res = await apiFetch(`/api/alerts/${id}`, { method: 'DELETE' });
+        const result = await res.json();
+        alert(result.message || 'Alarm dihapus.');
+        loadAlertsData();
+      } catch (e) {
+        alert('Gagal menghapus alarm: ' + e);
+      }
+    }
+
+    // 10. AI INSIGHT MODAL
+    async function openAiModal(sym) {
+      const modal = document.getElementById('ai-modal');
+      const title = document.getElementById('ai-modal-title');
+      const loading = document.getElementById('ai-modal-loading');
+      const content = document.getElementById('ai-modal-content');
+
+      modal.classList.remove('hidden');
+      loading.classList.remove('hidden');
+      content.classList.add('hidden');
+      title.innerText = `Analisis AI & Trading Plan: ${sym}`;
+
+      try {
+        const res = await apiFetch(`/api/ai/${sym}`);
+        const data = await res.json();
+
+        if (data.plan) {
+          const sig = data.plan.signal || 'NEUTRAL';
+          const sigEl = document.getElementById('plan-signal');
+          sigEl.innerText = sig;
+          sigEl.className = sig.includes('BUY') ? 'font-bold text-emerald-400 text-sm' : (sig.includes('SELL') ? 'font-bold text-rose-400 text-sm' : 'font-bold text-amber-400 text-sm');
+
+          document.getElementById('plan-buy-zone').innerText = `${formatIDR(data.plan.buy_min)} - ${formatIDR(data.plan.buy_max)}`;
+          document.getElementById('plan-tp').innerText = formatIDR(data.plan.tp2 || data.plan.tp1);
+          document.getElementById('plan-sl').innerText = formatIDR(data.plan.sl_price);
+        }
+
+        document.getElementById('ai-insight-text').innerText = data.insight || 'Insight AI sedang diproses...';
+
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+      } catch (e) {
+        loading.innerHTML = `<span class="text-rose-400">Gagal mengambil analisis AI untuk ${sym}: ${e}</span>`;
+      }
+    }
+
+    function openAiModalForCurrentSymbol() {
+      openAiModal(currentChartSymbol);
+    }
+
+    function closeAiModal() {
+      document.getElementById('ai-modal').classList.add('hidden');
+    }
+
+    // Startup
+    window.addEventListener('DOMContentLoaded', () => {
+      loadOverviewData();
+    });
+  </script>
+</body>
+</html>

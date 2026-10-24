@@ -17,6 +17,10 @@ ENV/
 # Log files & scratch data
 *.log
 scratch/
+charts/*.png
+scan_results.json
+alerts.json
+portfolio.json
 
 # OS specific files
 .DS_Store

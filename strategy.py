@@ -143,19 +143,32 @@ def analyze_ticker_momentum(df: pd.DataFrame) -> Dict[str, Any]:
         "reasons": reasons
     }
 
+def smart_round(val: float, base_price: float) -> float:
+    """Pembulatan adaptif sesuai skala harga aset (Crypto, Forex, Saham)"""
+    if base_price < 2.0:
+        return round(val, 4)
+    elif base_price < 500.0:
+        return round(val, 2)
+    elif base_price < 10000.0:
+        return round(val, 1) if (val % 1 != 0) else round(val)
+    else:
+        return round(val)
+
 def get_trading_plan(ticker: str, custom_tp_pct: Optional[float] = None, custom_sl_pct: Optional[float] = None) -> Dict[str, Any]:
     """
-    Menghitung Trading Plan lengkap untuk suatu saham:
+    Menghitung Trading Plan lengkap untuk suatu saham / crypto / forex:
     - Area Beli (Entry Area)
     - Level Stop Loss (SL)
     - Target Profit (TP1, TP2, TP3)
     - Support & Resistance
     - Risk to Reward Ratio
     """
-    from data_provider import get_stock_data, get_clean_symbol
-    symbol = get_clean_symbol(ticker)
-    df = get_stock_data(ticker, period="3mo", interval="1d")
-    if df.empty or len(df) < 20:
+    import config
+    from data_provider import get_stock_data, get_clean_symbol, normalize_ticker
+    norm_ticker = normalize_ticker(ticker)
+    symbol = get_clean_symbol(norm_ticker)
+    df = get_stock_data(norm_ticker, period="3mo", interval="1d")
+    if df.empty or len(df) < 15:
         return {"valid": False, "symbol": symbol, "error": "Data historis tidak mencukupi"}
     
     analysis = analyze_ticker_momentum(df)
@@ -163,24 +176,26 @@ def get_trading_plan(ticker: str, custom_tp_pct: Optional[float] = None, custom_
     tp_pct = custom_tp_pct or DEFAULT_TP2_PCT
     sl_pct = custom_sl_pct or DEFAULT_SL_PCT
     
-    support = round(float(df['Low'].tail(15).min()))
-    resistance = round(float(df['High'].tail(20).max()))
+    support = smart_round(float(df['Low'].tail(15).min()), close)
+    resistance = smart_round(float(df['High'].tail(20).max()), close)
     
-    buy_min = round(close * 0.99)
-    buy_max = round(close * 1.005)
+    buy_min = smart_round(close * 0.99, close)
+    buy_max = smart_round(close * 1.005, close)
     
-    sl_price = round(close * (1 - sl_pct / 100))
-    tp1 = round(close * (1 + DEFAULT_TP1_PCT / 100))
-    tp2 = round(close * (1 + tp_pct / 100))
-    tp3 = round(close * (1 + DEFAULT_TP3_PCT / 100))
+    sl_price = smart_round(close * (1 - sl_pct / 100), close)
+    tp1 = smart_round(close * (1 + DEFAULT_TP1_PCT / 100), close)
+    tp2 = smart_round(close * (1 + tp_pct / 100), close)
+    tp3 = smart_round(close * (1 + DEFAULT_TP3_PCT / 100), close)
     
-    risk = max(close - sl_price, 1)
+    risk = max(close - sl_price, 0.0001)
     reward = max(tp2 - close, 0)
     rrr = round(reward / risk, 2)
     
     return {
         "valid": True,
         "symbol": symbol,
+        "ticker": norm_ticker,
+        "asset_type": config.get_asset_type(norm_ticker),
         "close": close,
         "change_pct": analysis['change_pct'],
         "rvol": analysis['rvol'],

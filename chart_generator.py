@@ -22,7 +22,7 @@ if hasattr(sys.stdout, 'reconfigure'):
     except Exception:
         pass
 
-from config import format_idr
+from config import format_idr, format_price, get_display_name, get_asset_type
 from data_provider import get_stock_data, get_clean_symbol
 from strategy import get_trading_plan
 
@@ -31,24 +31,27 @@ CHARTS_DIR.mkdir(exist_ok=True)
 
 def generate_candlestick_chart(ticker: str, period: str = "3mo") -> Optional[str]:
     """
-    Menghasilkan gambar chart candlestick untuk saham tertentu.
+    Menghasilkan gambar chart candlestick untuk saham, crypto, komoditas, atau forex.
     Returns path file gambar (.png) atau None jika gagal.
     """
-    symbol = get_clean_symbol(ticker)
+    display_title = get_display_name(ticker)
     df = get_stock_data(ticker, period=period, interval="1d")
     
-    if df.empty or len(df) < 20:
+    if df.empty or len(df) < 15:
         return None
         
     plan = get_trading_plan(ticker)
     if not plan.get("valid"):
         return None
         
+    actual_ticker = plan.get("ticker", ticker)
+    asset_type = plan.get("asset_type", get_asset_type(actual_ticker))
+    
     # Ambil 50 candle terakhir agar grafik terlihat jelas dan proporsional
     df_plot = df.tail(50).copy()
     
     # Hitung MA20 dan MA50
-    df_plot['MA20'] = df['Close'].rolling(20).mean().loc[df_plot.index]
+    df_plot['MA20'] = df['Close'].rolling(min(20, len(df))).mean().loc[df_plot.index]
     df_plot['MA50'] = df['Close'].rolling(min(50, len(df))).mean().loc[df_plot.index]
     
     # Setting Style Dark Theme Modern
@@ -81,7 +84,7 @@ def generate_candlestick_chart(ticker: str, period: str = "3mo") -> Optional[str
     bar_width = 0.65
     for i in range(len(df_plot)):
         rect_bottom = min(opens[i], closes[i])
-        rect_height = max(abs(closes[i] - opens[i]), 1)
+        rect_height = max(abs(closes[i] - opens[i]), 1e-6)
         ax1.bar(
             x_indices[i], rect_height, bottom=rect_bottom,
             width=bar_width, color=colors[i], edgecolor=colors[i], alpha=0.95
@@ -97,29 +100,37 @@ def generate_candlestick_chart(ticker: str, period: str = "3mo") -> Optional[str
     tp_val = plan['tp2']
     sl_val = plan['sl_price']
     
-    ax1.axhline(entry_val, color='#00e5ff', linestyle='--', linewidth=1.2, alpha=0.7, label=f"Entry: Rp {entry_val:,.0f}")
-    ax1.axhline(tp_val, color='#00e676', linestyle='--', linewidth=1.4, alpha=0.9, label=f"Target TP (+5%): Rp {tp_val:,.0f}")
-    ax1.axhline(sl_val, color='#ff1744', linestyle='--', linewidth=1.4, alpha=0.9, label=f"Stop Loss (-3%): Rp {sl_val:,.0f}")
+    entry_lbl = format_price(entry_val, actual_ticker)
+    tp_lbl = format_price(tp_val, actual_ticker)
+    sl_lbl = format_price(sl_val, actual_ticker)
+    
+    ax1.axhline(entry_val, color='#00e5ff', linestyle='--', linewidth=1.2, alpha=0.7, label=f"Entry: {entry_lbl}")
+    ax1.axhline(tp_val, color='#00e676', linestyle='--', linewidth=1.4, alpha=0.9, label=f"Target TP (+5%): {tp_lbl}")
+    ax1.axhline(sl_val, color='#ff1744', linestyle='--', linewidth=1.4, alpha=0.9, label=f"Stop Loss (-3%): {sl_lbl}")
     
     # Shading Area Profit & Area Loss
     ax1.axhspan(entry_val, tp_val, color='#00e676', alpha=0.07)
     ax1.axhspan(sl_val, entry_val, color='#ff1744', alpha=0.07)
     
     # Konfigurasi Sumbu Harga (Ax1)
+    badge_market = "IDX" if asset_type == "stock" else asset_type.upper()
     ax1.set_title(
-        f"{symbol} (IDX) - Candlestick & Trading Plan\nHarga: Rp {entry_val:,.0f} ({plan['change_pct']:+.2f}%) | RVol: {plan['rvol']}x | RSI: {plan['rsi']}",
+        f"{display_title} ({badge_market}) - Candlestick & Trading Plan\nHarga: {entry_lbl} ({plan['change_pct']:+.2f}%) | RVol: {plan['rvol']}x | RSI: {plan['rsi']}",
         fontsize=13, fontweight='bold', color='#ffffff', pad=12
     )
 
     ax1.grid(True, linestyle=':', alpha=0.25, color='#90a4ae')
     ax1.legend(loc='upper left', fontsize=8.5, framealpha=0.6, facecolor='#121820', edgecolor='#37474f')
-    ax1.set_ylabel('Harga (IDR)', color='#cfd8dc', fontsize=9.5)
+    currency_label = "IDR" if asset_type == "stock" else ("JPY" if "JPY" in actual_ticker else "USD")
+    ax1.set_ylabel(f'Harga ({currency_label})', color='#cfd8dc', fontsize=9.5)
     ax1.tick_params(colors='#b0bec5', labelsize=8.5)
     
     # Subplot Volume (Ax2)
-    ax2.bar(x_indices, volumes / 1e6, color=colors, width=bar_width, alpha=0.85)
+    vol_scale = 1e6 if asset_type == "stock" else 1.0
+    vol_unit = "M" if asset_type == "stock" else ""
+    ax2.bar(x_indices, volumes / vol_scale, color=colors, width=bar_width, alpha=0.85)
     ax2.grid(True, linestyle=':', alpha=0.2, color='#90a4ae')
-    ax2.set_ylabel('Vol (Juta)', color='#cfd8dc', fontsize=8.5)
+    ax2.set_ylabel(f'Vol {vol_unit}'.strip(), color='#cfd8dc', fontsize=8.5)
     ax2.tick_params(colors='#b0bec5', labelsize=8)
     
     # Label tanggal pada sumbu X
@@ -130,7 +141,8 @@ def generate_candlestick_chart(ticker: str, period: str = "3mo") -> Optional[str
     
     plt.tight_layout()
     
-    chart_path = CHARTS_DIR / f"{symbol}_chart.png"
+    safe_sym = ticker.replace("=", "_").replace("/", "_").replace("-", "_").replace(".", "_")
+    chart_path = CHARTS_DIR / f"{safe_sym}_chart.png"
     plt.savefig(chart_path, dpi=150, facecolor=fig.get_facecolor(), edgecolor='none', bbox_inches='tight')
     plt.close(fig)
     

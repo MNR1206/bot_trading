@@ -33,7 +33,7 @@ if hasattr(sys.stdout, 'reconfigure'):
         pass
 
 import config
-from config import format_idr, DEFAULT_TP2_PCT, DEFAULT_SL_PCT
+from config import format_idr, format_price, get_asset_type, get_display_name, DEFAULT_TP2_PCT, DEFAULT_SL_PCT
 from data_provider import get_current_price, get_clean_symbol, get_ticker_summary
 from screener import run_screener
 from strategy import get_trading_plan
@@ -46,6 +46,17 @@ from chart_generator import generate_candlestick_chart
 from alert_manager import add_price_alert, get_user_alerts, delete_price_alert, check_all_alerts
 from bandarmology import analyze_bandarmology
 from watchlist_manager import add_to_watchlist, remove_from_watchlist, get_user_watchlist
+from news_provider import get_stock_news, get_market_news, format_news_markdown
+from top_movers import format_top_movers_summary, format_top_gainers_only, format_top_losers_only
+from special_screeners import format_ara_message, format_bsjp_message
+from crypto_forex import format_crypto_message, format_forex_message
+from technical_analysis import format_ta_message
+from swing_screener import format_bow_message
+from fundamental_provider import format_fundamental_message, format_calendar_message
+from ai_analyzer import get_ai_market_insight
+from bandar_screener import format_bandar_screener_message
+from sector_heatmap import format_sector_heatmap_message
+from breakout_scanner import format_breakout_message, check_new_breakout_alerts
 
 # Timezone WIB (UTC + 7)
 WIB = timezone(timedelta(hours=7))
@@ -72,14 +83,31 @@ def send_reply(chat_id: str, text: str, reply_markup: Optional[Dict[str, Any]] =
 def handle_start(chat_id: str, first_name: str):
     welcome_msg = f"""
 👋 *Halo {first_name}!* 
-Selamat datang di *Bot Trading Saham Indonesia (IDX / BEI) Super Lengkap* 🤖📈
+Selamat datang di *Bot Trading Saham Indonesia (IDX), Crypto & Forex Super Lengkap* 🤖📈
 
-Bot ini dilengkapi kecerdasan analisis kuantitatif, grafis visual, alarm harga, dan deteksi arus dana besar (Bandarmology).
+Bot ini dilengkapi analisis kuantitatif, grafis visual, AI market insight, berita terkini, pasar Crypto, Forex/Emas, konsensus teknikal, alarm harga, dan deteksi arus dana bandar (Bandarmology).
 
 📋 *Menu Perintah Lengkap:*
+  • `/ai <KODE>` - 🤖 Analisis Cerdas AI (Teknikal + Smart Money + Berita)
+  • `/akumulasi` - 🌐 Screener Akumulasi Smart Money & Bandar Hunter
+  • `/sektor` atau `/heatmap` - 🗺️ Radar Rotasi Sektor & Heatmap IDX (8 Sektor)
+  • `/breakout` - 🚨 Sinyal Breakout Lonjakan Volume & Resistensi (Auto-Alert)
+  • `/ta <KODE>` - 🧭 Meteran Konsensus Teknikal (TradingView Style)
+  • `/bow` - 🎣 Screener Buy on Weakness & Rebound Support
+  • `/fund <KODE>` - 🏢 Profil Fundamental, PER, PBV & Dividend Yield
+  • `/kalender` - 📅 Jadwal Cum-Date Dividen & Laporan Keuangan IDX
   • `/scan` - 🔍 Pindai saham IDX dengan lonjakan volume & momentum
+  • `/ara` - 🎯 Screener ARA Hunter (Terkunci ARA & Potensi Menuju ARA)
+  • `/bsjp` - 🌅 Screener BSJP (Beli Sore Jual Pagi - Candle & Akumulasi)
+  • `/crypto` - 🪙 Pasar Crypto Teratas (BTC, ETH, SOL, BNB, XRP, DOGE)
+  • `/forex` - 🌍 Pasar Forex & Logam Mulia (Gold/XAU, Silver, Oil, EUR/USD)
   • `/plan <KODE>` - 🎯 Trading Plan lengkap (Area Beli, Stop Loss & TP)
-  • `/chart <KODE>` - 📊 Kirim gambar grafik Candlestick + MA + TP/SL
+  • `/chart <KODE>` - 📊 Kirim grafik Candlestick + MA + TP/SL (contoh: `/chart BTC` atau `/chart XAU`)
+  • `/price <KODE>` - 💵 Cek harga instan saham, crypto, atau emas
+  • `/news [KODE]` - 📰 Berita terkini emiten / crypto / emas (contoh: `/news BBCA` atau `/news BTC`)
+  • `/topmovers` - 🔥 Ringkasan Top Gainers, Losers & Turnover Tertinggi
+  • `/topgain` - 🚀 Daftar saham kenaikan persentase tertinggi hari ini
+  • `/toploss` - 🔻 Daftar saham penurunan terdalam hari ini
   • `/alert <KODE> <HARGA>` - 🚨 Pasang alarm pengingat harga (contoh: `/alert BBCA 6000`)
   • `/alerts` - 📋 Lihat daftar alarm harga aktif
   • `/flow <KODE>` - 🌐 Cek arus dana asing & Bandarmology (contoh: `/flow BBRI`)
@@ -99,18 +127,39 @@ _Klik tombol cepat di bawah untuk mencoba fitur favorit:_
     keyboard = {
         "inline_keyboard": [
             [
+                {"text": "🌐 Screener Bandar", "callback_data": "btn_akumulasi"},
+                {"text": "🗺️ Rotasi Sektor", "callback_data": "btn_sektor"},
+                {"text": "🚨 Breakout Volume", "callback_data": "btn_breakout"}
+            ],
+            [
+                {"text": "🤖 AI Insight BBCA", "callback_data": "btn_ai_BBCA"},
+                {"text": "🧭 Meteran TA BBCA", "callback_data": "btn_ta_BBCA"}
+            ],
+            [
+                {"text": "🎣 Radar BoW / Swing", "callback_data": "btn_bow"},
+                {"text": "📅 Kalender Dividen", "callback_data": "btn_kalender"}
+            ],
+            [
                 {"text": "🔍 Scan Saham & SL/TP", "callback_data": "btn_scan"},
-                {"text": "💼 Cek Portofolio", "callback_data": "btn_portfolio"}
+                {"text": "💼 Portofolio", "callback_data": "btn_portfolio"}
+            ],
+            [
+                {"text": "🪙 Pasar Crypto (BTC)", "callback_data": "btn_crypto"},
+                {"text": "🌍 Forex & Gold (XAU)", "callback_data": "btn_forex"}
+            ],
+            [
+                {"text": "🎯 Screener ARA Hunter", "callback_data": "btn_ara"},
+                {"text": "🌅 Screener BSJP", "callback_data": "btn_bsjp"}
+            ],
+            [
+                {"text": "🚀 Top Gainers", "callback_data": "btn_topgain"},
+                {"text": "🔥 Top Movers", "callback_data": "btn_topmovers"},
+                {"text": "📰 Berita IHSG", "callback_data": "btn_news_market"}
             ],
             [
                 {"text": "📊 Chart BBCA", "callback_data": "btn_chart_BBCA"},
-                {"text": "📊 Chart BBRI", "callback_data": "btn_chart_BBRI"},
-                {"text": "🌐 Flow BMRI", "callback_data": "btn_flow_BMRI"}
-            ],
-            [
-                {"text": "🎯 Plan BBCA", "callback_data": "btn_plan_BBCA"},
-                {"text": "⭐ Watchlist Saya", "callback_data": "btn_watchlist"},
-                {"text": "🔔 Update Pasar", "callback_data": "btn_update_now"}
+                {"text": "🎯 Plan BTC", "callback_data": "btn_plan_BTC"},
+                {"text": "⭐ Watchlist", "callback_data": "btn_watchlist"}
             ]
         ]
     }
@@ -125,33 +174,61 @@ def handle_chart_cmd(chat_id: str, symbol: str):
     
     chart_file = generate_candlestick_chart(sym)
     if not chart_file or not os.path.exists(chart_file):
-        send_reply(chat_id, f"❌ Gagal membuat chart untuk `{sym}`. Pastikan simbol saham benar.")
+        send_reply(chat_id, f"❌ Gagal membuat chart untuk `{sym}`. Pastikan simbol/kode benar.")
         return
         
     plan = get_trading_plan(sym)
+    actual_ticker = plan.get('ticker', sym)
+    asset_type = plan.get('asset_type', get_asset_type(actual_ticker))
+    display_name = get_display_name(actual_ticker)
+    
     caption = f"""
-📊 *GRAFIK CANDLESTICK: {sym} (IDX)*
+📊 *GRAFIK CANDLESTICK: {display_name} ({asset_type.upper()})*
 ━━━━━━━━━━━━━━━━━━━━
-💵 *Harga Now:* `{format_idr(plan['close'])}` ({plan['change_pct']:+.2f}%)
-🛒 *Area Beli (Entry):* `{format_idr(plan['buy_min'])} - {format_idr(plan['buy_max'])}`
-🛑 *Stop Loss (SL):* `{format_idr(plan['sl_price'])}` (-{plan['sl_pct']:.1f}%)
-🎯 *Target TP 2:* `{format_idr(plan['tp2'])}` (+5.0%)
+💵 *Harga Now:* `{format_price(plan['close'], actual_ticker)}` ({plan['change_pct']:+.2f}%)
+🛒 *Area Beli (Entry):* `{format_price(plan['buy_min'], actual_ticker)} - {format_price(plan['buy_max'], actual_ticker)}`
+🛑 *Stop Loss (SL):* `{format_price(plan['sl_price'], actual_ticker)}` (-{plan['sl_pct']:.1f}%)
+🎯 *Target TP 2:* `{format_price(plan['tp2'], actual_ticker)}` (+5.0%)
 ⚖️ *Risk/Reward:* `1 : {plan['rrr']}`
 ━━━━━━━━━━━━━━━━━━━━
 """
-    keyboard = {
-        "inline_keyboard": [
-            [
-                {"text": f"🛒 Beli 1 Lot {sym}", "callback_data": f"btn_buy_{sym}_1"},
-                {"text": f"🛒 Beli 5 Lot {sym}", "callback_data": f"btn_buy_{sym}_5"},
-                {"text": f"🛒 Beli 10 Lot {sym}", "callback_data": f"btn_buy_{sym}_10"}
-            ],
-            [
-                {"text": f"🌐 Bandarmology {sym}", "callback_data": f"btn_flow_{sym}"},
-                {"text": f"🎯 Plan Detail", "callback_data": f"btn_plan_{sym}"}
+    if asset_type == "stock":
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🛒 Beli 1 Lot {sym}", "callback_data": f"btn_buy_{sym}_1"},
+                    {"text": f"🛒 Beli 5 Lot {sym}", "callback_data": f"btn_buy_{sym}_5"},
+                    {"text": f"🛒 Beli 10 Lot {sym}", "callback_data": f"btn_buy_{sym}_10"}
+                ],
+                [
+                    {"text": f"🤖 AI Insight {sym}", "callback_data": f"btn_ai_{sym}"},
+                    {"text": f"🧭 Teknikal {sym}", "callback_data": f"btn_ta_{sym}"},
+                    {"text": f"🏢 Fundamental {sym}", "callback_data": f"btn_fund_{sym}"}
+                ],
+                [
+                    {"text": f"🌐 Bandarmology {sym}", "callback_data": f"btn_flow_{sym}"},
+                    {"text": f"🎯 Plan Detail", "callback_data": f"btn_plan_{sym}"},
+                    {"text": f"📰 Berita {sym}", "callback_data": f"btn_news_{sym}"}
+                ]
             ]
-        ]
-    }
+        }
+    else:
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🤖 AI Insight {display_name}", "callback_data": f"btn_ai_{sym}"},
+                    {"text": f"🧭 Teknikal {display_name}", "callback_data": f"btn_ta_{sym}"}
+                ],
+                [
+                    {"text": f"🎯 Plan {display_name}", "callback_data": f"btn_plan_{sym}"},
+                    {"text": f"📰 Berita {display_name}", "callback_data": f"btn_news_{sym}"}
+                ],
+                [
+                    {"text": "🪙 Market Crypto", "callback_data": "btn_crypto"},
+                    {"text": "🌍 Forex & Gold", "callback_data": "btn_forex"}
+                ]
+            ]
+        }
     
     success = send_telegram_photo(chart_file, caption=caption.strip(), reply_markup=keyboard)
     if not success:
@@ -166,47 +243,109 @@ def handle_plan_cmd(chat_id: str, symbol: str):
     
     plan = get_trading_plan(sym)
     if not plan.get("valid"):
-        send_reply(chat_id, f"❌ Gagal memuat data `{sym}`: {plan.get('error', 'Saham tidak ditemukan')}")
+        send_reply(chat_id, f"❌ Gagal memuat data `{sym}`: {plan.get('error', 'Instrumen tidak ditemukan')}")
         return
         
+    actual_ticker = plan.get('ticker', sym)
+    asset_type = plan.get('asset_type', get_asset_type(actual_ticker))
+    display_name = get_display_name(actual_ticker)
+    
     signal_badge = "🔥 STRONG BUY" if plan['signal'] == 'STRONG BUY' else ("🟢 BUY" if plan['signal'] == 'BUY' else "⚪ NEUTRAL")
     chg_badge = "🟢" if plan['change_pct'] >= 0 else "🔴"
     
     msg = f"""
-🎯 *TRADING PLAN SAHAM: {plan['symbol']}*
+🎯 *TRADING PLAN: {display_name} ({asset_type.upper()})*
 ━━━━━━━━━━━━━━━━━━━━
 📊 *Status Pasar:* {signal_badge}
-💵 *Harga Terkini:* `{format_idr(plan['close'])}` ({chg_badge} {plan['change_pct']:+.2f}%)
+💵 *Harga Terkini:* `{format_price(plan['close'], actual_ticker)}` ({chg_badge} {plan['change_pct']:+.2f}%)
 📈 *RVol:* `{plan['rvol']}x` | *RSI:* `{plan['rsi']}`
 
 🛒 *REKOMENDASI BELI (ENTRY ZONE):*
-  • *Area Beli*  : `{format_idr(plan['buy_min'])} - {format_idr(plan['buy_max'])}`
-  • *Ideal Entry*: `{format_idr(plan['buy_entry_ideal'])}`
+  • *Area Beli*  : `{format_price(plan['buy_min'], actual_ticker)} - {format_price(plan['buy_max'], actual_ticker)}`
+  • *Ideal Entry*: `{format_price(plan['buy_entry_ideal'], actual_ticker)}`
 
 🛑 *BATAS RISIKO (STOP LOSS):*
-  • *Stop Loss (SL)*: `{format_idr(plan['sl_price'])}` (-{plan['sl_pct']:.1f}%)
-  ⚠️ *Wajib Cut Loss jika harga tembus ke bawah `{format_idr(plan['sl_price'])}`*
+  • *Stop Loss (SL)*: `{format_price(plan['sl_price'], actual_ticker)}` (-{plan['sl_pct']:.1f}%)
+  ⚠️ *Wajib Cut Loss jika harga tembus ke bawah `{format_price(plan['sl_price'], actual_ticker)}`*
 
 🎯 *TARGET TAKE PROFIT (TP):*
-  • *Target TP 1* : `{format_idr(plan['tp1'])}` (+3.0%)
-  • *Target TP 2* : `{format_idr(plan['tp2'])}` (+5.0%)
-  • *Target TP 3* : `{format_idr(plan['tp3'])}` (+8.0%)
+  • *Target TP 1* : `{format_price(plan['tp1'], actual_ticker)}` (+3.0%)
+  • *Target TP 2* : `{format_price(plan['tp2'], actual_ticker)}` (+5.0%)
+  • *Target TP 3* : `{format_price(plan['tp3'], actual_ticker)}` (+8.0%)
 
 ⚖️ *Risk to Reward Ratio:* `1 : {plan['rrr']}`
-🧱 *Support Terdekat:* `{format_idr(plan['support'])}`
-🏢 *Resistance:* `{format_idr(plan['resistance'])}`
+🧱 *Support Terdekat:* `{format_price(plan['support'], actual_ticker)}`
+🏢 *Resistance:* `{format_price(plan['resistance'], actual_ticker)}`
 ━━━━━━━━━━━━━━━━━━━━
+"""
+    if asset_type == "stock":
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🤖 AI Insight {sym}", "callback_data": f"btn_ai_{sym}"},
+                    {"text": f"🧭 Teknikal {sym}", "callback_data": f"btn_ta_{sym}"},
+                    {"text": f"🏢 Fundamental {sym}", "callback_data": f"btn_fund_{sym}"}
+                ],
+                [
+                    {"text": f"📊 Lihat Chart {sym}", "callback_data": f"btn_chart_{sym}"},
+                    {"text": f"🌐 Cek Bandar {sym}", "callback_data": f"btn_flow_{sym}"},
+                    {"text": f"📰 Berita {sym}", "callback_data": f"btn_news_{sym}"}
+                ],
+                [
+                    {"text": f"🛒 Beli 1 Lot {sym}", "callback_data": f"btn_buy_{sym}_1"},
+                    {"text": f"🛒 Beli 5 Lot {sym}", "callback_data": f"btn_buy_{sym}_5"},
+                    {"text": f"🛒 Beli 10 Lot {sym}", "callback_data": f"btn_buy_{sym}_10"}
+                ]
+            ]
+        }
+    else:
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"🤖 AI Insight {display_name}", "callback_data": f"btn_ai_{sym}"},
+                    {"text": f"🧭 Teknikal {display_name}", "callback_data": f"btn_ta_{sym}"}
+                ],
+                [
+                    {"text": f"📊 Lihat Chart {display_name}", "callback_data": f"btn_chart_{sym}"},
+                    {"text": f"📰 Berita {display_name}", "callback_data": f"btn_news_{sym}"}
+                ],
+                [
+                    {"text": "🪙 Market Crypto", "callback_data": "btn_crypto"},
+                    {"text": "🌍 Forex & Gold", "callback_data": "btn_forex"}
+                ]
+            ]
+        }
+    send_reply(chat_id, msg.strip(), reply_markup=keyboard)
+
+def handle_price_cmd(chat_id: str, symbol: str):
+    """
+    Menampilkan ringkasan harga instan untuk saham, crypto, komoditas, atau forex
+    """
+    sym = get_clean_symbol(symbol)
+    summary = get_ticker_summary(sym)
+    if not summary.get("valid"):
+        send_reply(chat_id, f"❌ Data harga untuk `{sym}` tidak ditemukan.")
+        return
+        
+    chg_sign = "+" if summary["change_pct"] >= 0 else ""
+    chg_badge = "🟢" if summary["change_pct"] >= 0 else "🔴"
+    disp_name = get_display_name(summary["ticker"])
+    
+    msg = f"""
+💵 *CEK HARGA: {disp_name}*
+━━━━━━━━━━━━━━━━━━━━
+📌 *Harga Terkini:* `{summary['formatted_price']}` ({chg_badge} `{chg_sign}{summary['change_pct']:.2f}%`)
+📊 *Tertinggi (High):* `{format_price(summary['high'], summary['ticker'])}`
+📉 *Terendah (Low):* `{format_price(summary['low'], summary['ticker'])}`
+🏁 *Open:* `{format_price(summary['open'], summary['ticker'])}` | *Prev Close:* `{format_price(summary['prev_close'], summary['ticker'])}`
+━━━━━━━━━━━━━━━━━━━━
+_Ketik `/plan {sym}` untuk trading plan atau `/chart {sym}` untuk candlestick chart._
 """
     keyboard = {
         "inline_keyboard": [
             [
-                {"text": f"📊 Lihat Chart {plan['symbol']}", "callback_data": f"btn_chart_{plan['symbol']}"},
-                {"text": f"🌐 Cek Bandar {plan['symbol']}", "callback_data": f"btn_flow_{plan['symbol']}"}
-            ],
-            [
-                {"text": f"🛒 Beli 1 Lot {plan['symbol']}", "callback_data": f"btn_buy_{plan['symbol']}_1"},
-                {"text": f"🛒 Beli 5 Lot {plan['symbol']}", "callback_data": f"btn_buy_{plan['symbol']}_5"},
-                {"text": f"🛒 Beli 10 Lot {plan['symbol']}", "callback_data": f"btn_buy_{plan['symbol']}_10"}
+                {"text": f"📊 Chart {disp_name}", "callback_data": f"btn_chart_{sym}"},
+                {"text": f"🎯 Plan {disp_name}", "callback_data": f"btn_plan_{sym}"}
             ]
         ]
     }
@@ -338,6 +477,333 @@ def handle_watchlist_cmd(chat_id: str):
 """
     reply += "_Ketik `/chart KODE` untuk grafik atau `/plan KODE` untuk detail._"
     send_reply(chat_id, reply.strip())
+
+def handle_news_cmd(chat_id: str, symbol_or_query: Optional[str] = None):
+    """
+    Mengambil dan menampilkan berita terkini saham IDX atau berita pasar modal makro (IHSG).
+    Format: /news atau /news <KODE_SAHAM>
+    """
+    sym = symbol_or_query.strip().upper() if symbol_or_query else ""
+    if sym:
+        clean_sym = get_clean_symbol(sym)
+        send_reply(chat_id, f"⏳ *Mencari berita terkini untuk saham {clean_sym}...*")
+        news_items = get_stock_news(clean_sym, limit=5)
+        header = f"📰 *BERITA TERKINI EMITEN: {clean_sym} (IDX)*"
+        reply_text = format_news_markdown(news_items, header)
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": f"📊 Chart {clean_sym}", "callback_data": f"btn_chart_{clean_sym}"},
+                    {"text": f"🎯 Plan {clean_sym}", "callback_data": f"btn_plan_{clean_sym}"},
+                    {"text": f"🌐 Bandar {clean_sym}", "callback_data": f"btn_flow_{clean_sym}"}
+                ],
+                [
+                    {"text": "🔥 Top Movers Hari Ini", "callback_data": "btn_topmovers"},
+                    {"text": "📰 Berita IHSG & Pasar", "callback_data": "btn_news_market"}
+                ]
+            ]
+        }
+    else:
+        send_reply(chat_id, "⏳ *Mengambil rangkuman berita pasar modal & IHSG terkini...*")
+        news_items = get_market_news(limit=5)
+        header = "📰 *BERITA PASAR MODAL & IHSG HARI INI*"
+        reply_text = format_news_markdown(news_items, header)
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "🚀 Top Gainers", "callback_data": "btn_topgain"},
+                    {"text": "🔻 Top Losers", "callback_data": "btn_toploss"},
+                    {"text": "🔥 Top Movers", "callback_data": "btn_topmovers"}
+                ],
+                [
+                    {"text": "🔍 Scan Sinyal BUY", "callback_data": "btn_scan"},
+                    {"text": "⭐ Watchlist", "callback_data": "btn_watchlist"}
+                ]
+            ]
+        }
+    send_reply(chat_id, reply_text, reply_markup=keyboard)
+
+def handle_topmovers_cmd(chat_id: str):
+    """
+    Menampilkan ringkasan Top Gainers, Top Losers, dan Most Active Turnover
+    """
+    send_reply(chat_id, "⏳ *Menghitung pergerakan Top Movers saham IDX hari ini...*")
+    msg = format_top_movers_summary(limit=5)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🚀 Top Gainers Lengkap", "callback_data": "btn_topgain"},
+                {"text": "🔻 Top Losers Lengkap", "callback_data": "btn_toploss"}
+            ],
+            [
+                {"text": "📰 Berita Pasar", "callback_data": "btn_news_market"},
+                {"text": "🔍 Scan Momentum", "callback_data": "btn_scan"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_topgain_cmd(chat_id: str):
+    """
+    Menampilkan daftar Top Gainers saham IDX hari ini
+    """
+    send_reply(chat_id, "⏳ *Mengambil daftar saham Top Gainers hari ini...*")
+    msg = format_top_gainers_only(limit=7)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🔻 Cek Top Losers", "callback_data": "btn_toploss"},
+                {"text": "🔥 Ringkasan Movers", "callback_data": "btn_topmovers"}
+            ],
+            [
+                {"text": "🔍 Scan Sinyal BUY", "callback_data": "btn_scan"},
+                {"text": "📰 Berita Pasar", "callback_data": "btn_news_market"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_toploss_cmd(chat_id: str):
+    """
+    Menampilkan daftar Top Losers saham IDX hari ini
+    """
+    send_reply(chat_id, "⏳ *Mengambil daftar saham Top Losers hari ini...*")
+    msg = format_top_losers_only(limit=7)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🚀 Cek Top Gainers", "callback_data": "btn_topgain"},
+                {"text": "🔥 Ringkasan Movers", "callback_data": "btn_topmovers"}
+            ],
+            [
+                {"text": "🔍 Scan Sinyal BUY", "callback_data": "btn_scan"},
+                {"text": "📰 Berita Pasar", "callback_data": "btn_news_market"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_ara_cmd(chat_id: str):
+    """
+    Screener Saham ARA Hunter (Auto Rejection Atas)
+    """
+    send_reply(chat_id, "⏳ *Memindai saham IDX untuk radar ARA Hunter...*\n_Menghitung batas harga ARA (+20% s/d +35%), fraksi harga, dan jarak sisa tick..._")
+    msg = format_ara_message(limit=7)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🌅 Cek Screener BSJP", "callback_data": "btn_bsjp"},
+                {"text": "🚀 Top Gainers", "callback_data": "btn_topgain"}
+            ],
+            [
+                {"text": "🔍 Scan Momentum Reguler", "callback_data": "btn_scan"},
+                {"text": "💼 Portofolio", "callback_data": "btn_portfolio"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_bsjp_cmd(chat_id: str):
+    """
+    Screener Saham BSJP (Beli Sore Jual Pagi)
+    """
+    send_reply(chat_id, "⏳ *Menjalankan Screener BSJP (Beli Sore Jual Pagi)...*\n_Menganalisis kekuatan candle penutupan, volume akumulasi, dan target jual pagi..._")
+    msg = format_bsjp_message(limit=6)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🎯 Cek ARA Hunter", "callback_data": "btn_ara"},
+                {"text": "🔥 Top Movers", "callback_data": "btn_topmovers"}
+            ],
+            [
+                {"text": "🔍 Scan Sinyal BUY", "callback_data": "btn_scan"},
+                {"text": "💼 Portofolio", "callback_data": "btn_portfolio"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_crypto_cmd(chat_id: str):
+    """
+    Menampilkan ringkasan pasar Crypto teratas (BTC, ETH, SOL, BNB, XRP, DOGE, ADA, AVAX)
+    """
+    send_reply(chat_id, "⏳ *Memuat ringkasan harga pasar Cryptocurrency terkini...*")
+    msg = format_crypto_message()
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "📊 Chart BTC", "callback_data": "btn_chart_BTC"},
+                {"text": "🎯 Plan BTC", "callback_data": "btn_plan_BTC"},
+                {"text": "📰 Berita BTC", "callback_data": "btn_news_BTC"}
+            ],
+            [
+                {"text": "📊 Chart ETH", "callback_data": "btn_chart_ETH"},
+                {"text": "🎯 Plan ETH", "callback_data": "btn_plan_ETH"},
+                {"text": "📊 Chart SOL", "callback_data": "btn_chart_SOL"}
+            ],
+            [
+                {"text": "🌍 Forex & Gold", "callback_data": "btn_forex"},
+                {"text": "🔄 Refresh Crypto", "callback_data": "btn_crypto"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_forex_cmd(chat_id: str):
+    """
+    Menampilkan ringkasan pasar Forex & Komoditas dunia (Gold/XAU, Silver, Oil, EURUSD, GBPUSD, USDJPY)
+    """
+    send_reply(chat_id, "⏳ *Memuat ringkasan pasar Forex & Komoditas dunia...*")
+    msg = format_forex_message()
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "📊 Chart Gold (XAU)", "callback_data": "btn_chart_XAU"},
+                {"text": "🎯 Plan Gold", "callback_data": "btn_plan_XAU"},
+                {"text": "📰 Berita Gold", "callback_data": "btn_news_XAU"}
+            ],
+            [
+                {"text": "📊 Chart Silver", "callback_data": "btn_chart_XAG"},
+                {"text": "📊 Chart Oil", "callback_data": "btn_chart_OIL"},
+                {"text": "📊 Chart EURUSD", "callback_data": "btn_chart_EURUSD"}
+            ],
+            [
+                {"text": "🪙 Market Crypto", "callback_data": "btn_crypto"},
+                {"text": "🔄 Refresh Forex", "callback_data": "btn_forex"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_ai_cmd(chat_id: str, symbol: str):
+    """
+    Menampilkan AI Market Insight (Sintesis Teknikal, Smart Money, dan Sentimen Berita)
+    """
+    sym = get_clean_symbol(symbol)
+    send_reply(chat_id, f"🧠 *AI sedang menganalisis sentimen teknikal, arus bandar, dan berita {sym}...*")
+    msg = get_ai_market_insight(sym)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": f"🎯 Plan {sym}", "callback_data": f"btn_plan_{sym}"},
+                {"text": f"🧭 Teknikal {sym}", "callback_data": f"btn_ta_{sym}"},
+                {"text": f"📊 Chart {sym}", "callback_data": f"btn_chart_{sym}"}
+            ],
+            [
+                {"text": f"🏢 Fundamental {sym}", "callback_data": f"btn_fund_{sym}"},
+                {"text": f"📰 Berita {sym}", "callback_data": f"btn_news_{sym}"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_ta_cmd(chat_id: str, symbol: str):
+    """
+    Menampilkan Konsensus Meteran Teknikal (TradingView style)
+    """
+    sym = get_clean_symbol(symbol)
+    send_reply(chat_id, f"⏳ *Menghitung meteran konsensus teknikal untuk {sym}...*")
+    msg = format_ta_message(sym)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": f"🤖 AI Insight {sym}", "callback_data": f"btn_ai_{sym}"},
+                {"text": f"🎯 Plan {sym}", "callback_data": f"btn_plan_{sym}"},
+                {"text": f"📊 Chart {sym}", "callback_data": f"btn_chart_{sym}"}
+            ],
+            [
+                {"text": f"🏢 Fundamental {sym}", "callback_data": f"btn_fund_{sym}"},
+                {"text": f"🌐 Bandarmology {sym}", "callback_data": f"btn_flow_{sym}"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_bow_cmd(chat_id: str):
+    """
+    Screener Buy on Weakness (BoW) & Swing Rebound
+    """
+    send_reply(chat_id, "⏳ *Memindai saham Buy on Weakness (BoW) & Swing Rebound...*\n_Mencari saham diskon/oversold di area support kuat dengan potensi pembalikan arah..._")
+    msg = format_bow_message(limit=6)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🔍 Scan Sinyal BUY", "callback_data": "btn_scan"},
+                {"text": "🌅 Screener BSJP", "callback_data": "btn_bsjp"}
+            ],
+            [
+                {"text": "🎯 Screener ARA", "callback_data": "btn_ara"},
+                {"text": "📅 Kalender Dividen", "callback_data": "btn_kalender"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_fund_cmd(chat_id: str, symbol: str):
+    """
+    Menampilkan profil fundamental dan valuasi emiten
+    """
+    sym = get_clean_symbol(symbol)
+    send_reply(chat_id, f"⏳ *Memuat rasio fundamental & valuasi {sym}...*")
+    msg = format_fundamental_message(sym)
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": f"🤖 AI Insight {sym}", "callback_data": f"btn_ai_{sym}"},
+                {"text": f"🧭 Teknikal {sym}", "callback_data": f"btn_ta_{sym}"},
+                {"text": f"🎯 Plan {sym}", "callback_data": f"btn_plan_{sym}"}
+            ],
+            [
+                {"text": "📅 Kalender Dividen", "callback_data": "btn_kalender"},
+                {"text": f"📰 Berita {sym}", "callback_data": f"btn_news_{sym}"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_kalender_cmd(chat_id: str):
+    """
+    Menampilkan kalender aksi korporasi & jadwal dividen IDX
+    """
+    send_reply(chat_id, "⏳ *Mengambil kalender aksi korporasi & jadwal dividen IDX...*")
+    msg = format_calendar_message()
+    keyboard = {
+        "inline_keyboard": [
+            [
+                {"text": "🎣 Screener BoW", "callback_data": "btn_bow"},
+                {"text": "🔥 Top Movers", "callback_data": "btn_topmovers"}
+            ],
+            [
+                {"text": "🏢 Fundamental BBCA", "callback_data": "btn_fund_BBCA"},
+                {"text": "🏢 Fundamental BBRI", "callback_data": "btn_fund_BBRI"}
+            ]
+        ]
+    }
+    send_reply(chat_id, msg, reply_markup=keyboard)
+
+def handle_akumulasi_cmd(chat_id: str):
+    """
+    Screener Akumulasi Smart Money & Bandar Hunter seluruh saham IDX
+    """
+    send_reply(chat_id, "⏳ *Memindai seluruh saham IDX untuk Akumulasi Smart Money & Bandar Hunter...*\n_Menganalisis Big Inflow Score, Chaikin Money Flow (CMF), dan tren OBV..._")
+    msg, markup = format_bandar_screener_message()
+    send_reply(chat_id, msg, reply_markup=markup)
+
+def handle_sektor_cmd(chat_id: str):
+    """
+    Radar Rotasi Sektor & Heatmap IDX
+    """
+    send_reply(chat_id, "⏳ *Menghitung radar rotasi sektor & performa 8 sektor utama IDX...*")
+    msg, markup = format_sector_heatmap_message()
+    send_reply(chat_id, msg, reply_markup=markup)
+
+def handle_breakout_cmd(chat_id: str):
+    """
+    Radar Lonjakan Volume Breakout & Volume Spike Hunter
+    """
+    send_reply(chat_id, "⏳ *Memindai saham dengan lonjakan volume mendadak (RVol ≥ 2.0x) & kenaikan harga...*")
+    msg, markup = format_breakout_message()
+    send_reply(chat_id, msg, reply_markup=markup)
 
 def handle_calc_cmd(chat_id: str, args: list):
     """
@@ -599,6 +1065,44 @@ def process_callback_query(query: Dict[str, Any]):
             sym = parts[2]
             lots = int(parts[3])
             handle_buy_cmd(chat_id, [sym, str(lots)])
+    elif data == "btn_topmovers":
+        handle_topmovers_cmd(chat_id)
+    elif data == "btn_topgain":
+        handle_topgain_cmd(chat_id)
+    elif data == "btn_toploss":
+        handle_toploss_cmd(chat_id)
+    elif data == "btn_ara":
+        handle_ara_cmd(chat_id)
+    elif data == "btn_bsjp":
+        handle_bsjp_cmd(chat_id)
+    elif data == "btn_news_market":
+        handle_news_cmd(chat_id, None)
+    elif data == "btn_crypto":
+        handle_crypto_cmd(chat_id)
+    elif data == "btn_forex":
+        handle_forex_cmd(chat_id)
+    elif data == "btn_bow":
+        handle_bow_cmd(chat_id)
+    elif data == "btn_kalender":
+        handle_kalender_cmd(chat_id)
+    elif data == "btn_akumulasi":
+        handle_akumulasi_cmd(chat_id)
+    elif data == "btn_sektor":
+        handle_sektor_cmd(chat_id)
+    elif data == "btn_breakout":
+        handle_breakout_cmd(chat_id)
+    elif data.startswith("btn_ai_"):
+        sym = data.replace("btn_ai_", "")
+        handle_ai_cmd(chat_id, sym)
+    elif data.startswith("btn_ta_"):
+        sym = data.replace("btn_ta_", "")
+        handle_ta_cmd(chat_id, sym)
+    elif data.startswith("btn_fund_"):
+        sym = data.replace("btn_fund_", "")
+        handle_fund_cmd(chat_id, sym)
+    elif data.startswith("btn_news_"):
+        sym = data.replace("btn_news_", "")
+        handle_news_cmd(chat_id, sym)
     elif data == "btn_update_now":
         handle_scan_cmd(chat_id, header_prefix="🔔 *UPDATE PASAR SAHAM IDX SAAT INI*")
 
@@ -668,11 +1172,71 @@ def background_monitoring_loop():
                         last_triggered_key = slot_key
                         header = f"🔔 *[EOD: PENUTUPAN BURSA EFEK INDONESIA - {now.strftime('%H:%M')} WIB]* 🏁\n_Ringkasan penutupan pasar hari ini & saham terbaik untuk watchlist besok:_"
                         handle_scan_cmd(chat_id, header_prefix=header)
+
+                # Auto Volume Breakout Alert selama jam perdagangan aktif (09:00 - 16:00 WIB)
+                if (9 <= hour < 12) or (13 <= hour < 16):
+                    try:
+                        today_str = str(now.date())
+                        new_breakouts = check_new_breakout_alerts(today_str)
+                        for s in new_breakouts:
+                            turn = s['turnover']
+                            turn_str = f"Rp {turn / 1_000_000_000:.1f} M" if turn >= 1_000_000_000 else format_idr(turn)
+                            spike_msg = (
+                                f"🚨 *[REAL-TIME BREAKOUT ALERT!]* ⚡\n"
+                                f"━━━━━━━━━━━━━━━━━━━━\n"
+                                f"📌 *Saham:* `{s['symbol']}`\n"
+                                f"💵 *Harga Terkini:* `{format_idr(s['close'])}` (+{s['change_pct']}%)\n"
+                                f"🔥 *Lonjakan Volume:* `{s['rvol']:.1f}x Lipat Normal`!\n"
+                                f"💰 *Nilai Transaksi:* `{turn_str}`\n"
+                                f"🎯 *Resistensi 20H:* `{format_idr(s['high_20d'])}`\n"
+                                f"━━━━━━━━━━━━━━━━━━━━\n"
+                                f"_Sinyal otomatis terdeteksi saat bursa berjalan. Ketik `/plan {s['symbol']}` atau `/chart {s['symbol']}`._"
+                            )
+                            send_reply(chat_id, spike_msg.strip())
+                    except Exception as eb:
+                        pass
                         
             time.sleep(30)
         except Exception as e:
             print(f"⚠️ Error scheduler loop: {e}")
             time.sleep(30)
+
+def register_bot_commands(token: str):
+    """
+    Mendaftarkan tombol menu slash command ke Telegram API agar muncul di tombol Menu bot Telegram user
+    """
+    commands = [
+        {"command": "start", "description": "Buka menu navigasi & tombol klik interaktif"},
+        {"command": "ai", "description": "Analisis cerdas AI (Teknikal + Bandar + Berita)"},
+        {"command": "ta", "description": "Konsensus teknikal meter TradingView style"},
+        {"command": "bow", "description": "Screener Buy on Weakness & Rebound Support"},
+        {"command": "fund", "description": "Rasio fundamental, PER, PBV, dan Dividen"},
+        {"command": "kalender", "description": "Jadwal dividen Cum-Date dan agenda emiten"},
+        {"command": "akumulasi", "description": "Screener akumulasi Smart Money & bandar hunter"},
+        {"command": "sektor", "description": "Radar rotasi sektor & heatmap performa 8 sektor IDX"},
+        {"command": "breakout", "description": "Radar lonjakan volume & breakout resistance"},
+        {"command": "scan", "description": "Scan saham momentum & volume spike"},
+        {"command": "ara", "description": "Screener ARA Hunter & Potensi ARA"},
+        {"command": "bsjp", "description": "Screener Beli Sore Jual Pagi (BSJP)"},
+        {"command": "topmovers", "description": "Ringkasan Top Gainers, Losers & Turnover"},
+        {"command": "topgain", "description": "Daftar saham kenaikan tertinggi hari ini"},
+        {"command": "toploss", "description": "Daftar saham penurunan terdalam hari ini"},
+        {"command": "crypto", "description": "Pasar Crypto teratas (BTC, ETH, SOL, BNB)"},
+        {"command": "forex", "description": "Pasar Forex & Logam Mulia (Gold/XAU, Oil)"},
+        {"command": "news", "description": "Berita finansial & pasar modal terkini"},
+        {"command": "chart", "description": "Grafik candlestick teknikal (contoh: /chart BBCA)"},
+        {"command": "plan", "description": "Trading plan lengkap (Area Beli, TP, SL)"},
+        {"command": "flow", "description": "Analisis bandarmology & CMF (contoh: /flow BBRI)"},
+        {"command": "calc", "description": "Kalkulator lot sizing risiko rupiah"},
+        {"command": "portfolio", "description": "Portofolio & saldo paper trading"},
+        {"command": "watchlist", "description": "Pantau saham-saham favorit pribadi"},
+        {"command": "alerts", "description": "Lihat daftar price alert aktif"},
+        {"command": "help", "description": "Panduan lengkap semua fitur"}
+    ]
+    try:
+        requests.post(f"https://api.telegram.org/bot{token}/setMyCommands", json={"commands": commands}, timeout=10)
+    except Exception:
+        pass
 
 def start_interactive_listener():
     """
@@ -682,6 +1246,9 @@ def start_interactive_listener():
     if not token or not chat_id:
         print("❌ Token Telegram atau Chat ID belum dikonfigurasi.")
         return
+
+    # Daftarkan daftar slash commands resmi ke Telegram agar muncul di Menu bot
+    register_bot_commands(token)
 
     # Mulai thread scheduler & alarm di background
     sched_thread = threading.Thread(target=background_monitoring_loop, daemon=True)
@@ -726,6 +1293,19 @@ def start_interactive_listener():
                 
                 if cmd in ["/start", "/help", "start", "help", "menu"]:
                     handle_start(sender_chat_id, first_name)
+                elif cmd.startswith("/ai"):
+                    sym = cmd_args[0] if cmd_args else "BBCA"
+                    handle_ai_cmd(sender_chat_id, sym)
+                elif cmd.startswith("/ta") or cmd in ["/analisis", "analisis", "ta"]:
+                    sym = cmd_args[0] if cmd_args else "BBCA"
+                    handle_ta_cmd(sender_chat_id, sym)
+                elif cmd in ["/bow", "bow", "/swing", "swing"]:
+                    handle_bow_cmd(sender_chat_id)
+                elif cmd.startswith("/fund") or cmd.startswith("/fundamental"):
+                    sym = cmd_args[0] if cmd_args else "BBCA"
+                    handle_fund_cmd(sender_chat_id, sym)
+                elif cmd in ["/kalender", "kalender", "/calendar", "calendar", "/dividen", "dividen"]:
+                    handle_kalender_cmd(sender_chat_id)
                 elif cmd in ["/scan", "scan"]:
                     handle_scan_cmd(sender_chat_id)
                 elif cmd.startswith("/chart"):
@@ -737,9 +1317,20 @@ def start_interactive_listener():
                 elif cmd.startswith("/price"):
                     sym = cmd_args[0] if cmd_args else "BBCA"
                     handle_price_cmd(sender_chat_id, sym)
+                elif cmd in ["/akumulasi", "akumulasi", "/bandarhunter", "bandarhunter"]:
+                    handle_akumulasi_cmd(sender_chat_id)
+                elif cmd in ["/sektor", "sektor", "/heatmap", "heatmap", "/sector", "sector"]:
+                    handle_sektor_cmd(sender_chat_id)
+                elif cmd in ["/breakout", "breakout", "/spike", "spike"]:
+                    handle_breakout_cmd(sender_chat_id)
                 elif cmd.startswith("/flow") or cmd.startswith("/bandar"):
-                    sym = cmd_args[0] if cmd_args else "BBCA"
-                    handle_bandarmology_cmd(sender_chat_id, sym)
+                    if cmd_args:
+                        handle_bandarmology_cmd(sender_chat_id, cmd_args[0])
+                    elif cmd.startswith("/bandar"):
+                        # /bandar tanpa argumen = screener akumulasi bandar
+                        handle_akumulasi_cmd(sender_chat_id)
+                    else:
+                        handle_bandarmology_cmd(sender_chat_id, "BBCA")
                 elif cmd.startswith("/calc"):
                     handle_calc_cmd(sender_chat_id, cmd_args)
                 elif cmd.startswith("/alert") and not cmd.startswith("/alerts"):
@@ -760,6 +1351,23 @@ def start_interactive_listener():
                     handle_scan_cmd(sender_chat_id, header_prefix="🔔 *UPDATE MANUAL PASAR SAHAM IDX*")
                 elif cmd in ["/portfolio", "portfolio"]:
                     handle_portfolio_cmd(sender_chat_id)
+                elif cmd.startswith("/news"):
+                    sym = cmd_args[0] if cmd_args else ""
+                    handle_news_cmd(sender_chat_id, sym)
+                elif cmd in ["/topmovers", "topmovers", "/movers", "movers"]:
+                    handle_topmovers_cmd(sender_chat_id)
+                elif cmd in ["/topgain", "/topgainers", "topgain", "gainers"]:
+                    handle_topgain_cmd(sender_chat_id)
+                elif cmd in ["/toploss", "/toplosers", "toploss", "losers"]:
+                    handle_toploss_cmd(sender_chat_id)
+                elif cmd in ["/ara", "ara", "/arahunter", "arahunter"]:
+                    handle_ara_cmd(sender_chat_id)
+                elif cmd in ["/bsjp", "bsjp"]:
+                    handle_bsjp_cmd(sender_chat_id)
+                elif cmd in ["/crypto", "crypto", "/btc", "btc"]:
+                    handle_crypto_cmd(sender_chat_id)
+                elif cmd in ["/forex", "forex", "/commodity", "commodity", "/emas", "emas", "/gold", "gold", "/xau", "xau"]:
+                    handle_forex_cmd(sender_chat_id)
                 elif cmd.startswith("/buy"):
                     handle_buy_cmd(sender_chat_id, cmd_args)
                 elif cmd.startswith("/sell"):

@@ -33,21 +33,21 @@ def analyze_bandarmology(ticker: str) -> Dict[str, Any]:
 
     data = df.copy()
 
-    # 1. Chaikin Money Flow (CMF) 20 Hari
+    # 1. (CMF) 20 Hari
     hl_diff = (data['High'] - data['Low']).replace(0, 0.0001)
     mfm = ((data['Close'] - data['Low']) - (data['High'] - data['Close'])) / hl_diff
     mfv = mfm * data['Volume']
     cmf_20 = mfv.rolling(20).sum() / data['Volume'].rolling(20).sum().replace(0, 1)
     current_cmf = float(cmf_20.iloc[-1])
 
-    # 2. On-Balance Volume (OBV)
+    # 2. (OBV)
     direction = np.sign(data['Close'].diff()).fillna(0)
     obv = (direction * data['Volume']).cumsum()
     obv_ma20 = obv.rolling(20).mean()
     current_obv = float(obv.iloc[-1])
     is_obv_uptrend = bool(obv.iloc[-1] > obv_ma20.iloc[-1])
 
-    # 3. Relative Volume (RVol)
+    # 3. (RVol)
     vol_ma20 = data['Volume'].rolling(20).mean()
     rvol = float(data['Volume'].iloc[-1] / vol_ma20.iloc[-1]) if vol_ma20.iloc[-1] > 0 else 1.0
 

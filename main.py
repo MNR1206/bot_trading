@@ -24,6 +24,17 @@ from paper_trader import (
     update_and_check_portfolio, reset_portfolio
 )
 from telegram_notifier import test_telegram_connection, send_telegram_message
+from news_provider import get_stock_news, get_market_news, format_news_markdown
+from top_movers import format_top_movers_summary
+from special_screeners import format_ara_message, format_bsjp_message
+from crypto_forex import format_crypto_message, format_forex_message
+from technical_analysis import format_ta_message
+from swing_screener import format_bow_message
+from fundamental_provider import format_fundamental_message, format_calendar_message
+from ai_analyzer import get_ai_market_insight
+from bandar_screener import format_bandar_screener_message
+from sector_heatmap import format_sector_heatmap_message
+from breakout_scanner import format_breakout_message
 
 BANNER = r"""
 ╔═══════════════════════════════════════════════════════════════╗
@@ -45,6 +56,20 @@ def print_menu():
     print("  [7] 🤖 Jalankan Auto-Monitoring Loop (Pemantau Otomatis Berkala)")
     print("  [8] 📱 Cek Status & Tes Notifikasi Telegram")
     print("  [9] ⚙️  Reset Saldo Portofolio Paper Trading")
+    print("  [10] 🔥 Top Movers IDX (Top Gainers, Losers & Most Active)")
+    print("  [11] 📰 Berita Pasar Modal & Saham Terkini (RSS)")
+    print("  [12] 🎯 Screener Saham ARA Hunter (Auto Rejection Atas)")
+    print("  [13] 🌅 Screener Saham BSJP (Beli Sore Jual Pagi)")
+    print("  [14] 🪙 Pasar Crypto Teratas (BTC, ETH, SOL, BNB, XRP, DOGE)")
+    print("  [15] 🌍 Pasar Forex & Logam Mulia Dunia (Gold/XAU, Silver, Oil)")
+    print("  [16] 🤖 AI Market Insight (Sintesis Teknikal, Bandar & Berita)")
+    print("  [17] 🧭 Meteran Konsensus Teknikal TradingView Style")
+    print("  [18] 🎣 Screener Buy on Weakness (BoW) & Swing Rebound")
+    print("  [19] 🏢 Profil Fundamental, PER, PBV & Dividen")
+    print("  [20] 📅 Kalender Aksi Korporasi & Dividen IDX")
+    print("  [21] 🌐 Screener Akumulasi Smart Money & Bandar Hunter")
+    print("  [22] 🗺️ Radar Rotasi Sektor & Heatmap IDX")
+    print("  [23] 🚨 Radar Lonjakan Volume Breakout (Auto Volume Spike)")
     print("  [0] ❌ Keluar")
     print("─" * 63)
 
@@ -254,6 +279,61 @@ def interactive_loop():
             confirm = input(f"Yakin ingin mereset portofolio kembali ke modal awal {format_idr(INITIAL_BALANCE)}? (y/n): ").strip().lower()
             if confirm == 'y':
                 reset_portfolio()
+        elif choice == "10":
+            print("\n⏳ Mengambil data Top Movers IDX hari ini...")
+            print(format_top_movers_summary(limit=5))
+        elif choice == "11":
+            target = input("Masukkan kode saham untuk berita spesifik (atau kosongkan untuk berita pasar IHSG): ").strip().upper()
+            if target:
+                print(f"\n⏳ Mengambil berita terkini saham {target}...")
+                news_list = get_stock_news(target, limit=5)
+                print(format_news_markdown(news_list, f"📰 BERITA SAHAM {target}"))
+            else:
+                print("\n⏳ Mengambil berita pasar modal IHSG terkini...")
+                news_list = get_market_news(limit=5)
+                print(format_news_markdown(news_list, "📰 BERITA PASAR MODAL & IHSG"))
+        elif choice == "12":
+            print("\n⏳ Menjalankan Screener ARA Hunter...")
+            print(format_ara_message(limit=8))
+        elif choice == "13":
+            print("\n⏳ Menjalankan Screener BSJP (Beli Sore Jual Pagi)...")
+            print(format_bsjp_message(limit=8))
+        elif choice == "14":
+            print("\n⏳ Mengambil data pasar Cryptocurrency teratas...")
+            print(format_crypto_message())
+        elif choice == "15":
+            print("\n⏳ Mengambil data pasar Forex & Komoditas dunia...")
+            print(format_forex_message())
+        elif choice == "16":
+            target = input("Masukkan kode saham / crypto / emas (contoh: BBCA, BTC, XAU): ").strip().upper() or "BBCA"
+            print(f"\n⏳ Menganalisis AI Market Insight untuk {target}...")
+            print(get_ai_market_insight(target))
+        elif choice == "17":
+            target = input("Masukkan kode saham / aset (contoh: BBCA, BTC): ").strip().upper() or "BBCA"
+            print(f"\n⏳ Menghitung konsensus teknikal untuk {target}...")
+            print(format_ta_message(target))
+        elif choice == "18":
+            print("\n⏳ Menjalankan Screener Buy on Weakness (BoW)...")
+            print(format_bow_message())
+        elif choice == "19":
+            target = input("Masukkan kode saham (contoh: BBCA, BBRI): ").strip().upper() or "BBCA"
+            print(f"\n⏳ Mengambil profil fundamental {target}...")
+            print(format_fundamental_message(target))
+        elif choice == "20":
+            print("\n⏳ Mengambil kalender aksi korporasi & dividen...")
+            print(format_calendar_message())
+        elif choice == "21":
+            print("\n⏳ Menjalankan Screener Akumulasi Smart Money...")
+            msg, _ = format_bandar_screener_message()
+            print(msg)
+        elif choice == "22":
+            print("\n⏳ Menghitung Radar Rotasi Sektor & Heatmap IDX...")
+            msg, _ = format_sector_heatmap_message()
+            print(msg)
+        elif choice == "23":
+            print("\n⏳ Memindai Sinyal Lonjakan Volume Breakout...")
+            msg, _ = format_breakout_message()
+            print(msg)
         elif choice == "0":
             print("\n👋 Terima kasih telah menggunakan Bot Trading Saham Indonesia. Salam Cuan!\n")
             break
@@ -265,6 +345,21 @@ def interactive_loop():
 def main():
     parser = argparse.ArgumentParser(description="Bot Trading Saham Indonesia (IDX / BEI)")
     parser.add_argument("--scan", action="store_true", help="Jalankan screener langsung")
+    parser.add_argument("--ara", action="store_true", help="Jalankan Screener ARA Hunter (Auto Rejection Atas)")
+    parser.add_argument("--bsjp", action="store_true", help="Jalankan Screener BSJP (Beli Sore Jual Pagi)")
+    parser.add_argument("--crypto", action="store_true", help="Tampilkan harga pasar cryptocurrency teratas")
+    parser.add_argument("--forex", action="store_true", help="Tampilkan harga pasar forex dan komoditas dunia (Gold/Oil)")
+    parser.add_argument("--ai", type=str, help="Analisis AI Market Insight (contoh: --ai BBCA)")
+    parser.add_argument("--ta", type=str, help="Konsensus teknikal meter (contoh: --ta BBCA)")
+    parser.add_argument("--bow", action="store_true", help="Jalankan Screener Buy on Weakness")
+    parser.add_argument("--fund", type=str, help="Profil fundamental dan dividen (contoh: --fund BBCA)")
+    parser.add_argument("--kalender", action="store_true", help="Tampilkan kalender dividen dan agenda emiten")
+    parser.add_argument("--topmovers", action="store_true", help="Tampilkan Top Gainers, Losers, dan Most Active")
+    parser.add_argument("--akumulasi", action="store_true", help="Jalankan Screener Akumulasi Smart Money / Bandar Hunter")
+    parser.add_argument("--sektor", action="store_true", help="Tampilkan Radar Rotasi Sektor & Heatmap IDX")
+    parser.add_argument("--breakout", action="store_true", help="Tampilkan Radar Lonjakan Volume Breakout")
+    parser.add_argument("--web", action="store_true", help="Jalankan Web Dashboard Trading Terminal (FastAPI)")
+    parser.add_argument("--news", type=str, nargs="?", const="", help="Tampilkan berita saham atau IHSG (contoh: --news BBCA atau --news)")
     parser.add_argument("--backtest", type=str, help="Jalankan backtest untuk simbol tertentu (contoh: --backtest BBCA)")
     parser.add_argument("--portfolio", action="store_true", help="Tampilkan ringkasan portofolio paper trading")
     parser.add_argument("--monitor", action="store_true", help="Jalankan auto-monitoring loop")
@@ -274,6 +369,47 @@ def main():
     
     if args.scan:
         run_screener(show_all=False)
+    elif args.ara:
+        print(format_ara_message(limit=8))
+    elif args.bsjp:
+        print(format_bsjp_message(limit=8))
+    elif args.crypto:
+        print(format_crypto_message())
+    elif args.forex:
+        print(format_forex_message())
+    elif args.ai:
+        print(get_ai_market_insight(args.ai))
+    elif args.ta:
+        print(format_ta_message(args.ta))
+    elif args.bow:
+        print(format_bow_message())
+    elif args.fund:
+        print(format_fundamental_message(args.fund))
+    elif args.kalender:
+        print(format_calendar_message())
+    elif args.akumulasi:
+        msg, _ = format_bandar_screener_message()
+        print(msg)
+    elif args.sektor:
+        msg, _ = format_sector_heatmap_message()
+        print(msg)
+    elif args.breakout:
+        msg, _ = format_breakout_message()
+        print(msg)
+    elif args.web:
+        import uvicorn
+        print('\n🚀 Memulai Web Dashboard IDX Smart Trading Terminal...')
+        print('🌐 Buka browser di: http://localhost:8000\n')
+        uvicorn.run('web_app.main:app', host='0.0.0.0', port=8000, reload=True)
+    elif args.topmovers:
+        print(format_top_movers_summary(limit=5))
+    elif args.news is not None:
+        if args.news:
+            news_list = get_stock_news(args.news, limit=5)
+            print(format_news_markdown(news_list, f"📰 BERITA SAHAM {args.news.upper()}"))
+        else:
+            news_list = get_market_news(limit=5)
+            print(format_news_markdown(news_list, "📰 BERITA PASAR MODAL & IHSG"))
     elif args.backtest:
         res = run_backtest_single(args.backtest)
         print_backtest_report(res)

@@ -10,19 +10,60 @@ from typing import Optional, Dict, Any, Tuple
 _DATA_CACHE: Dict[str, Tuple[float, pd.DataFrame]] = {}
 CACHE_EXPIRY_SECONDS = 300  # 5 menit
 
+import config
+
 def normalize_ticker(ticker: str) -> str:
     """
-    Memastikan ticker berakhiran .JK untuk Bursa Efek Indonesia.
-    Contoh: 'BBCA' -> 'BBCA.JK', 'bbri.jk' -> 'BBRI.JK'
+    Menormalkan ticker untuk berbagai kelas aset:
+    - Crypto (contoh: 'BTC' -> 'BTC-USD', 'ETH' -> 'ETH-USD')
+    - Logam Mulia / Komoditas (contoh: 'XAU' -> 'GC=F', 'XAG' -> 'SI=F', 'OIL' -> 'CL=F')
+    - Forex (contoh: 'EURUSD' -> 'EURUSD=X', 'USDJPY' -> 'USDJPY=X')
+    - Saham IDX (contoh: 'BBCA' -> 'BBCA.JK')
     """
-    ticker = ticker.strip().upper()
-    if not ticker.endswith(".JK"):
-        ticker += ".JK"
-    return ticker
+    t = ticker.strip().upper()
+    if t in config.SYMBOL_ALIASES:
+        return config.SYMBOL_ALIASES[t]
+    if t.endswith(".JK") or t.endswith("-USD") or t.endswith("=X") or t.endswith("=F"):
+        return t
+        
+    # Safeguard jika ada simbol komoditas / forex dengan format khusus
+    if "XAU" in t or "GOLD" in t or "EMAS" in t:
+        return "GC=F"
+    elif "XAG" in t or "SILVER" in t or "PERAK" in t:
+        return "SI=F"
+    elif "OIL" in t or "MINYAK" in t or "WTI" in t or "CRUDE" in t:
+        return "CL=F"
+    elif "EURUSD" in t:
+        return "EURUSD=X"
+    elif "GBPUSD" in t:
+        return "GBPUSD=X"
+    elif "USDJPY" in t:
+        return "USDJPY=X"
+    elif "AUDUSD" in t:
+        return "AUDUSD=X"
+    
+    # Jika tidak memiliki ekstensi lain, default ke saham BEI (.JK)
+    return f"{t}.JK"
 
 def get_clean_symbol(ticker: str) -> str:
-    """Menghilangkan suffix .JK untuk tampilan antarmuka (misal: 'BBCA.JK' -> 'BBCA')"""
-    return ticker.strip().upper().replace(".JK", "")
+    """Mengembalikan kode simbol bersih tanpa suffix (contoh: BBCA.JK -> BBCA, BTC-USD -> BTC, GC=F -> XAU)"""
+    t = ticker.strip().upper()
+    if t in config.SYMBOL_ALIASES:
+        t = config.SYMBOL_ALIASES[t]
+        
+    if t.endswith(".JK"):
+        return t.replace(".JK", "")
+    elif t == "GC=F" or "XAU" in t or "GOLD" in t or "EMAS" in t:
+        return "XAU"
+    elif t == "SI=F" or "XAG" in t or "SILVER" in t or "PERAK" in t:
+        return "XAG"
+    elif t == "CL=F" or "OIL" in t or "WTI" in t:
+        return "OIL"
+    elif t.endswith("=X"):
+        return t.replace("=X", "")
+    elif t.endswith("-USD"):
+        return t.replace("-USD", "")
+    return t
 
 def get_stock_data(ticker: str, period: str = "6mo", interval: str = "1d", force_refresh: bool = False) -> pd.DataFrame:
     """
@@ -50,7 +91,7 @@ def get_stock_data(ticker: str, period: str = "6mo", interval: str = "1d", force
         t = yf.Ticker(symbol)
         df = t.history(period=period, interval=interval, auto_adjust=True)
         
-        if df.empty or len(df) < 5:
+        if df.empty or len(df) < 1:
             return pd.DataFrame()
             
         # Standardisasi kolom
@@ -114,5 +155,7 @@ def get_ticker_summary(ticker: str) -> Dict[str, Any]:
         "high": float(last_row['High']),
         "low": float(last_row['Low']),
         "open": float(last_row['Open']),
-        "date": str(df.index[-1].date())
+        "date": str(df.index[-1].date()),
+        "asset_type": config.get_asset_type(symbol),
+        "formatted_price": config.format_price(close_price, symbol)
     }
